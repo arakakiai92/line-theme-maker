@@ -1,0 +1,3440 @@
+<!doctype html>
+<html lang="ja">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>LINE 着せかえ規格ジェネレーター (ONエフェクト完全リアルタイム連動版)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <style>
+    body {
+      background: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .phone {
+      width: 290px;
+      height: 580px;
+      border: 8px solid #1e293b;
+      border-radius: 34px;
+      overflow: hidden;
+      background: #fff;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.18);
+      position: relative;
+    }
+
+    .phone-screen {
+      height: 100%;
+      position: relative;
+      overflow: hidden;
+      background: #edf8fb;
+    }
+
+    .preview-sticky {
+      position: sticky;
+      top: 62px;
+    }
+
+    .panel-scroll {
+      max-height: calc(100vh - 120px);
+      overflow-y: auto;
+      padding-right: 4px;
+      scroll-behavior: smooth;
+    }
+
+    .panel-scroll::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .panel-scroll::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 99px;
+    }
+
+    /* 透過確認チェッカーボード背景 */
+    .checker-bg {
+      background-color: #ffffff;
+      background-image: linear-gradient(45deg, #f1f5f9 25%, transparent 25%),
+        linear-gradient(-45deg, #f1f5f9 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #f1f5f9 75%),
+        linear-gradient(-45deg, transparent 75%, #f1f5f9 75%);
+      background-size: 12px 12px;
+      background-position: 0 0, 0 6px, 6px -6px, -6px 0;
+    }
+
+    .tab-btn {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+
+    .tab-btn:hover {
+      background: #f8fafc;
+    }
+
+    .tab-btn.active {
+      background: #00C300;
+      color: #fff;
+      border-color: #00C300;
+      box-shadow: 0 2px 5px rgba(0, 195, 0, 0.3);
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 12px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+    }
+
+    .drop-zone {
+      border: 1.5px dashed #94a3b8;
+      border-radius: 8px;
+      transition: all .2s;
+    }
+
+    .drop-zone.dragover {
+      border-color: #00C300;
+      background: #f0fdf4;
+    }
+
+    input[type=range] {
+      height: 5px;
+      accent-color: #00C300;
+    }
+
+    #mobilePreviewModal,
+    #cropperStudioModal,
+    #menuStudioModal {
+      transition: opacity 0.2s ease, visibility 0.2s ease;
+    }
+
+    #mobilePreviewModal.active,
+    #cropperStudioModal.active,
+    #menuStudioModal.active {
+      opacity: 1;
+      visibility: visible;
+    }
+  </style>
+</head>
+
+<body class="text-slate-800 pb-16 lg:pb-8">
+
+  <!-- ヘッダー -->
+  <header class="bg-[#00C300] text-white shadow-md sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto flex items-center justify-between px-3 py-2">
+      <div class="flex items-center gap-2">
+        <img src="top-left.png" alt="Logo" class="h-8 w-8 object-contain drop-shadow"
+          onerror="this.style.display='none'">
+        <div>
+          <div class="flex items-center gap-1.5">
+            <h1 class="text-xs md:text-sm font-bold tracking-tight">LINE着せかえ 自動規格化ツール</h1>
+            <span id="saveStatus" class="text-[9px] bg-white/20 px-1.5 py-0.5 rounded text-white/90 font-medium">☁️
+              準備中</span>
+          </div>
+          <p class="text-[9px] text-emerald-100 hidden md:block">基本5アイコン・消しゴム削除・ONエフェクト即時反映</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <button id="openGlobalStudioBtn"
+          class="text-[10px] md:text-xs font-bold bg-white text-emerald-700 hover:bg-emerald-50 px-2.5 py-1 rounded shadow flex items-center gap-1 transition">
+          <span>✂ 大画像から切り出し</span>
+        </button>
+        <a href="https://aalinezipmaker.netlify.app/" target="_blank" rel="noopener noreferrer"
+          class="text-[10px] md:text-xs font-semibold bg-white/20 hover:bg-white/30 px-2 py-1 rounded whitespace-nowrap transition hidden sm:inline-block">
+          🔗 ZIPメーカー
+        </a>
+        <button id="exportZipBtn"
+          class="text-[10px] md:text-xs font-bold bg-slate-900 hover:bg-black text-white px-2.5 py-1 rounded shadow flex items-center gap-1 transition">
+          <span>📦 ZIP出力</span>
+        </button>
+        <button id="resetAllBtn"
+          class="text-[10px] md:text-xs font-medium bg-white/10 hover:bg-red-500 hover:text-white px-2 py-1 rounded transition"
+          title="すべてリセット">
+          ↺
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto p-2 md:p-4">
+    <div class="grid lg:grid-cols-[minmax(0,1fr)_315px] gap-4 items-start">
+
+      <!-- 左パネル: 素材設定＆調整エリア -->
+      <section class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="p-2 border-b border-slate-200 bg-slate-50 overflow-x-auto">
+          <div class="flex gap-1 min-w-max" id="tabContainer"></div>
+        </div>
+
+        <div class="px-3 py-1.5 bg-emerald-50/70 border-b border-emerald-100 flex items-center justify-between">
+          <div>
+            <h2 id="sectionTitle" class="text-xs font-bold text-slate-800 flex items-center gap-1"></h2>
+            <p id="sectionDesc" class="text-[9px] text-slate-600 mt-0.5"></p>
+          </div>
+          <div id="sectionAction"></div>
+        </div>
+
+        <!-- B専用ツールバー -->
+        <div id="quickJumpBar"
+          class="hidden px-2.5 py-1.5 bg-slate-100 border-b border-slate-200 flex flex-wrap items-center justify-between gap-1 text-[9px]">
+          <div class="flex items-center gap-1 overflow-x-auto max-w-[65%]">
+            <span class="text-slate-500 font-bold whitespace-nowrap">ジャンプ:</span>
+            <div id="jumpButtons" class="flex items-center gap-1"></div>
+          </div>
+          <div class="flex items-center gap-1">
+            <button id="openMenuStudioGlobalBtn"
+              class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2 py-1 rounded shadow-xs whitespace-nowrap transition flex items-center gap-1">
+              <span>🎛️ 専用スタジオでON/OFF確認</span>
+            </button>
+            <button id="copyHomeOnToAllBtn"
+              class="bg-slate-800 hover:bg-black text-white font-bold px-2 py-1 rounded shadow-xs whitespace-nowrap transition flex items-center gap-1">
+              <span>⚡ 1番の設定を全ONへコピー</span>
+            </button>
+            <button id="copyBaseToSelectedBtn" type="button"
+              class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-2 py-1 rounded shadow-xs whitespace-nowrap transition flex items-center gap-1">
+              <span>📋 1番をベースにコピー</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="panel-scroll p-2.5 md:p-3 space-y-3" id="assetList"></div>
+      </section>
+
+      <!-- 右パネル: PC用 実機プレビュー (基本5アイコン) -->
+      <aside class="hidden lg:block preview-sticky" id="desktopPreviewAside">
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-3" id="previewContainerPC"></div>
+      </aside>
+
+    </div>
+  </main>
+
+  <!-- スマホ用フローティングボタン -->
+  <div class="lg:hidden fixed bottom-3 right-3 z-30 flex items-center gap-2">
+    <button id="openMobileStudioBtn"
+      class="flex items-center gap-1 bg-emerald-600 text-white text-xs font-bold px-3 py-2.5 rounded-full shadow-lg active:scale-95 transition">
+      <span>✂ 切り出し</span>
+    </button>
+    <button id="openMobilePreviewBtn"
+      class="flex items-center gap-1.5 bg-slate-900 text-white text-xs font-bold px-3.5 py-2.5 rounded-full shadow-lg border border-slate-700 active:scale-95 transition">
+      <span>📱 プレビュー</span>
+    </button>
+  </div>
+
+  <!-- スマホ用モーダルプレビュー -->
+  <div id="mobilePreviewModal"
+    class="lg:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 opacity-0 pointer-events-none transition-all">
+    <div class="bg-white w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl p-3 max-h-[92vh] overflow-y-auto shadow-2xl">
+      <div class="flex items-center justify-between pb-2 mb-2 border-b">
+        <span class="font-bold text-xs text-slate-800">📱 実機プレビュー確認 (基本5アイコン)</span>
+        <button id="closeMobilePreviewBtn"
+          class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-full font-bold">✕
+          閉じる</button>
+      </div>
+      <div id="previewContainerMobile"></div>
+    </div>
+  </div>
+
+  <!-- 大画像切り出しスタジオ モーダル -->
+  <div id="cropperStudioModal"
+    class="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-2 md:p-4 opacity-0 pointer-events-none transition-all">
+    <div class="bg-white w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh]">
+      <div class="bg-slate-900 text-white px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="text-base">✂</span>
+          <h3 class="font-bold text-sm md:text-base">大画像切り出しスタジオ</h3>
+          <span
+            class="text-[10px] text-emerald-400 bg-emerald-950/60 border border-emerald-800 px-2 py-0.5 rounded">1枚のシートから各パーツへ連続抽出</span>
+        </div>
+        <button id="closeStudioBtn"
+          class="text-slate-400 hover:text-white text-sm bg-slate-800 hover:bg-slate-700 w-7 h-7 rounded-full flex items-center justify-center">✕</button>
+      </div>
+      <div class="bg-slate-100 p-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div class="flex items-center gap-2 flex-1 min-w-[280px]">
+          <span class="font-bold text-slate-700 whitespace-nowrap">切り出し先パーツ:</span>
+          <select id="studioTargetSelect"
+            class="bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 font-bold text-slate-800 flex-1 truncate"></select>
+        </div>
+        <div class="flex items-center gap-2">
+          <label
+            class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold px-3 py-1.5 rounded-lg cursor-pointer flex items-center gap-1 shadow-xs">
+            <span>📁 別の画像を読み込む</span>
+            <input type="file" id="studioFileInput" accept="image/png,image/jpeg,image/webp" class="hidden">
+          </label>
+        </div>
+      </div>
+      <div class="flex-1 overflow-y-auto p-3 md:p-4 grid md:grid-cols-[1fr_260px] gap-4">
+        <div class="flex flex-col">
+          <div class="flex items-center justify-between mb-1.5 text-xs">
+            <span class="text-slate-500 font-medium">ドラッグで枠を移動 / 下のスライダーで枠の大きさを変更</span>
+            <span id="studioImgDimensions" class="font-mono text-slate-400 text-[11px]"></span>
+          </div>
+          <div
+            class="relative bg-slate-900 checker-bg rounded-xl overflow-hidden flex items-center justify-center min-h-[300px] max-h-[55vh] border select-none touch-none"
+            id="cropCanvasWrapper">
+            <canvas id="cropSourceCanvas" class="max-w-full max-h-[55vh] object-contain"></canvas>
+            <div id="cropBoxOverlay"
+              class="absolute border-2 border-[#00C300] bg-emerald-400/20 shadow-[0_0_0_9999px_rgba(0,0,0,0.6)] cursor-move flex items-center justify-center">
+              <span
+                class="bg-[#00C300] text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow pointer-events-none">切り出し枠</span>
+            </div>
+          </div>
+          <div class="mt-2.5 bg-slate-50 p-2.5 rounded-xl border border-slate-200 grid grid-cols-2 gap-3 text-xs">
+            <label class="block">
+              枠サイズ: <b id="cropBoxSizeVal" class="font-mono text-emerald-700">100%</b>
+              <input type="range" id="cropBoxSizeRange" min="10" max="100" value="50" class="w-full mt-1">
+            </label>
+            <div class="flex items-end justify-end gap-1.5">
+              <button id="centerCropBoxBtn"
+                class="bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold px-2.5 py-1 rounded text-xs">枠を中央に戻す</button>
+            </div>
+          </div>
+        </div>
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 flex flex-col justify-between">
+          <div>
+            <h4 class="font-bold text-xs text-slate-800 border-b pb-1.5 mb-2.5 flex items-center justify-between">
+              <span>切り出し結果プレビュー</span>
+              <span id="targetSpecLabel" class="text-[10px] text-emerald-700 font-mono"></span>
+            </h4>
+            <div
+              class="checker-bg border border-slate-200 rounded-lg h-36 flex items-center justify-center overflow-hidden mb-2 shadow-xs">
+              <canvas id="cropResultPreviewCanvas"
+                class="max-h-full max-w-full object-contain pointer-events-none"></canvas>
+            </div>
+            <p class="text-[10px] text-slate-400 text-center mb-3">元画像から直接パーツを切り出します</p>
+          </div>
+          <div class="space-y-2 pt-2 border-t border-slate-200">
+            <button id="applyCropAndNextBtn"
+              class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl shadow transition flex items-center justify-center gap-1.5 text-xs">
+              <span>✅ 適用して次のパーツへ</span>
+            </button>
+            <button id="applyCropAndCloseBtn"
+              class="w-full bg-slate-800 hover:bg-black text-white font-bold py-2 rounded-xl transition text-xs">
+              <span>完了してスタジオを閉じる</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ★★★ メニューボタン専用スタジオ モーダル ★★★ -->
+  <div id="menuStudioModal"
+    class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-2 md:p-4 opacity-0 pointer-events-none transition-all">
+    <div class="bg-white w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[96vh]">
+      <!-- ヘッダー -->
+      <div class="bg-slate-900 text-white px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="text-lg">🎛️</span>
+          <div>
+            <h3 class="font-bold text-sm md:text-base flex items-center gap-2">
+              <span>メニューボタン専用スタジオ</span>
+              <span id="menuStudioItemBadge"
+                class="bg-emerald-600 text-white text-[11px] px-2 py-0.5 rounded font-mono font-bold">1. ホーム</span>
+            </h3>
+            <p class="text-[10px] text-emerald-400">ON/OFFの切り替えタップ感をリアルタイム比較・調整</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <select id="menuStudioItemSelect"
+            class="bg-slate-800 text-white text-xs font-bold px-2.5 py-1.5 rounded border border-slate-700 cursor-pointer"></select>
+          <button id="closeMenuStudioBtn"
+            class="text-slate-400 hover:text-white text-sm bg-slate-800 hover:bg-slate-700 w-7 h-7 rounded-full flex items-center justify-center">✕</button>
+        </div>
+      </div>
+
+      <!-- サブバー: ON/OFF切替スイッチ & 背景シミュレート -->
+      <div
+        class="bg-slate-100 px-4 py-2 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div class="flex items-center gap-2">
+          <span class="font-bold text-slate-700">表示モード:</span>
+          <div class="flex bg-slate-200 p-0.5 rounded-lg">
+            <button id="mStudioViewOffBtn"
+              class="px-3 py-1 rounded-md font-bold transition bg-white text-slate-900 shadow-xs">🔘 OFF (通常)</button>
+            <button id="mStudioViewOnBtn"
+              class="px-3 py-1 rounded-md font-bold transition text-slate-600 hover:text-slate-900">✨ ON (タップ時)</button>
+          </div>
+          <label
+            class="flex items-center gap-1 font-bold text-emerald-800 bg-emerald-50 px-2 py-1 rounded border border-emerald-200 cursor-pointer ml-1 select-none">
+            <input type="checkbox" id="mStudioTapSimToggle" class="rounded text-emerald-600">
+            <span>⚡ タップシミュレート (自動点滅)</span>
+          </label>
+        </div>
+
+        <div class="flex items-center gap-1.5 text-[11px]">
+          <span class="text-slate-500 font-medium">背景:</span>
+          <button class="bg-toggle-btn px-2 py-0.5 rounded bg-white border border-slate-300 font-bold"
+            data-bg="checker">🏁 透過</button>
+          <button class="bg-toggle-btn px-2 py-0.5 rounded bg-white border border-slate-300 font-semibold"
+            data-bg="white">⚪ 白</button>
+          <button class="bg-toggle-btn px-2 py-0.5 rounded bg-white border border-slate-300 font-semibold"
+            data-bg="black">⚫ 黒</button>
+        </div>
+      </div>
+
+      <!-- メイン作業エリア -->
+      <div class="flex-1 overflow-y-auto p-4 grid md:grid-cols-[1fr_310px] gap-5 items-start">
+        <div class="flex flex-col items-center justify-center">
+          <div
+            class="relative bg-slate-900 checker-bg rounded-2xl overflow-hidden border-2 border-emerald-500 shadow-inner flex items-center justify-center w-[300px] h-[300px] cursor-grab select-none touch-none"
+            id="mStudioCanvasWrapper">
+            <canvas id="mStudioMainCanvas" class="w-full h-full object-contain pointer-events-none"></canvas>
+            <div id="mStudioGuideOverlay" class="absolute inset-0 pointer-events-none flex items-center justify-center">
+              <div class="w-full h-[1px] bg-emerald-500/40 absolute"></div>
+              <div class="h-full w-[1px] bg-emerald-500/40 absolute"></div>
+              <div class="border border-dashed border-emerald-400/80 rounded absolute inset-1 pointer-events-none">
+              </div>
+              <span id="mStudioModeBadge"
+                class="absolute bottom-2 right-2 text-[10px] text-white bg-emerald-600/90 px-1.5 py-0.5 rounded font-bold">🔘
+                OFF 編集枠</span>
+            </div>
+          </div>
+          <p id="mStudioInstruction" class="text-[11px] text-slate-500 mt-2 text-center">
+            💡 画像を<b>ドラッグして移動</b> / <b>ホイールで拡大縮小 (最大1000%)</b>
+          </p>
+
+          <!-- 下部: iOS 26 / Android 規格プレビュー -->
+          <div class="w-full max-w-[340px] mt-3 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="text-[10px] font-bold text-slate-700">実機規格プレビュー (下揃え接地)</span>
+              <span id="mStudioCurrentStateTag"
+                class="text-[8px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded font-mono">OFF表示中</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div class="bg-white p-1 rounded border text-center">
+                <span class="text-[8px] text-slate-400 block font-mono">iOS 26 (80×56)</span>
+                <div class="h-10 flex items-end justify-center pb-0.5">
+                  <canvas id="mStudioPreviewIosCv" class="max-h-full max-w-full object-contain"></canvas>
+                </div>
+              </div>
+              <div class="bg-white p-1 rounded border text-center">
+                <span class="text-[8px] text-slate-400 block font-mono">従来/Android (128×150)</span>
+                <div class="h-10 flex items-end justify-center pb-0.5">
+                  <canvas id="mStudioPreviewAndCv" class="max-h-full max-w-full object-contain"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 右: 調整タブ -->
+        <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 flex flex-col justify-between h-full">
+          <div>
+            <div class="flex border-b border-slate-200 mb-3 text-xs font-bold">
+              <button id="mStudioTabOffBtn"
+                class="flex-1 py-1.5 border-b-2 border-emerald-600 text-emerald-800 text-center">🔘 OFF
+                (位置・消しゴム)</button>
+              <button id="mStudioTabOnBtn"
+                class="flex-1 py-1.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800 text-center">✨ ON
+                (加工・効果)</button>
+            </div>
+
+            <!-- OFF調整パネル -->
+            <div id="mStudioPanelOff" class="space-y-3">
+              <div class="flex items-center gap-1.5 bg-slate-200/80 p-0.5 rounded-lg text-xs mb-2">
+                <button id="mStudioModeMoveBtn"
+                  class="flex-1 py-1 rounded font-bold transition bg-white text-slate-900 shadow-xs">✋ 移動・拡大</button>
+                <button id="mStudioModeEraserBtn"
+                  class="flex-1 py-1 rounded font-bold transition text-slate-600 hover:text-slate-900">🧹 消しゴム</button>
+              </div>
+              <div id="mStudioEraserSizes"
+                class="hidden flex items-center justify-between text-xs bg-white p-1.5 rounded border border-slate-200">
+                <span class="text-slate-500 font-bold text-[10px]">太さ:</span>
+                <button class="m-eraser-btn px-2 py-0.5 rounded border border-slate-300 bg-white font-bold text-[10px]"
+                  data-size="12">細 (12)</button>
+                <button
+                  class="m-eraser-btn px-2 py-0.5 rounded border border-emerald-500 bg-emerald-50 text-emerald-800 font-bold text-[10px]"
+                  data-size="24">中 (24)</button>
+                <button class="m-eraser-btn px-2 py-0.5 rounded border border-slate-300 bg-white font-bold text-[10px]"
+                  data-size="44">太 (44)</button>
+              </div>
+
+              <div>
+                <div class="flex items-center justify-between mb-1 text-xs">
+                  <span class="font-bold text-slate-700">🔍 拡大率</span>
+                  <span id="mStudioScaleVal"
+                    class="font-mono font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded text-[11px]">100%</span>
+                </div>
+                <input type="range" id="mStudioScaleRange" min="10" max="1000" value="100" class="w-full">
+              </div>
+
+              <div>
+                <div class="flex items-center justify-between mb-1 text-xs">
+                  <span class="font-bold text-slate-700">↔️ 水平位置 (X)</span>
+                  <span id="mStudioXVal"
+                    class="font-mono font-bold text-slate-800 bg-white border px-2 py-0.5 rounded text-[11px]">0px</span>
+                </div>
+                <input type="range" id="mStudioXRange" min="-800" max="800" value="0" class="w-full">
+              </div>
+
+              <div>
+                <div class="flex items-center justify-between mb-1 text-xs">
+                  <span class="font-bold text-slate-700">↕️ 垂直位置 (Y)</span>
+                  <span id="mStudioYVal"
+                    class="font-mono font-bold text-slate-800 bg-white border px-2 py-0.5 rounded text-[11px]">0px</span>
+                </div>
+                <input type="range" id="mStudioYRange" min="-800" max="800" value="0" class="w-full">
+              </div>
+
+              <div class="pt-1 grid grid-cols-2 gap-2 text-xs">
+                <button id="mStudioCenterBtn"
+                  class="bg-white hover:bg-slate-100 text-slate-700 font-bold py-1.5 rounded border transition">🎯
+                  中央</button>
+                <button id="mStudioResetBtn"
+                  class="bg-white hover:bg-slate-100 text-slate-700 font-bold py-1.5 rounded border transition">↺
+                  初期化</button>
+              </div>
+            </div>
+
+            <!-- ON調整パネル -->
+            <div id="mStudioPanelOn" class="hidden space-y-2 text-xs">
+              <div
+                class="bg-emerald-50 border border-emerald-200 p-2 rounded-lg text-[10px] text-emerald-900 font-semibold mb-1">
+                💡 スライダーや効果を操作すると、自動でONエフェクトが有効化され即座に大画面に反映されます。
+              </div>
+
+              <div class="space-y-2">
+                <div
+                  class="flex flex-wrap items-center gap-1 text-[8px] bg-white p-1.5 rounded border border-slate-200">
+                  <span class="text-slate-500 font-bold block w-full mb-0.5">ワンクリック:</span>
+                  <button type="button"
+                    class="m-preset-btn px-1.5 py-0.5 rounded bg-slate-100 border hover:bg-slate-200 font-bold"
+                    data-preset="press_in">🔘 ポコッと凹む</button>
+                  <button type="button"
+                    class="m-preset-btn px-1.5 py-0.5 rounded bg-cyan-50 border border-cyan-300 text-cyan-800 font-bold"
+                    data-preset="neon_blue">💙 ネオン青</button>
+                  <button type="button"
+                    class="m-preset-btn px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-300 text-emerald-800 font-bold"
+                    data-preset="neon_green">💚 ネオン緑</button>
+                  <button type="button"
+                    class="m-preset-btn px-1.5 py-0.5 rounded bg-pink-50 border border-pink-300 text-pink-800 font-bold"
+                    data-preset="neon_pink">💖 ネオン桃</button>
+                  <button type="button" class="m-preset-btn px-1.5 py-0.5 rounded bg-slate-100 border font-bold"
+                    data-preset="outline_white">⚪ 白フチ</button>
+                  <button type="button"
+                    class="m-preset-btn px-1.5 py-0.5 rounded bg-amber-50 border border-amber-300 text-amber-800 font-bold"
+                    data-preset="jump_up">🚀 浮き出る</button>
+                </div>
+
+                <div class="grid grid-cols-2 gap-1.5 bg-white p-1.5 rounded border border-slate-200 text-[10px]">
+                  <label class="block">
+                    縮小: <b id="mAgScaleVal" class="font-mono text-emerald-700">90%</b>
+                    <input type="range" id="mAgScaleRange" min="70" max="115" value="90" class="w-full">
+                  </label>
+                  <label class="block">
+                    上下 (Y): <b id="mAgYVal" class="font-mono text-emerald-700">0px</b>
+                    <input type="range" id="mAgYRange" min="-12" max="12" value="0" class="w-full">
+                  </label>
+                </div>
+
+                <div class="grid grid-cols-2 gap-1.5 bg-white p-1.5 rounded border border-slate-200 text-[10px]">
+                  <div class="flex items-center justify-between">
+                    <label class="flex items-center gap-1 cursor-pointer font-semibold">
+                      <input type="checkbox" id="mAgNeonToggle" class="rounded text-cyan-600">
+                      <span>背景ネオン</span>
+                    </label>
+                    <input type="color" id="mAgNeonPicker" value="#00ffcc"
+                      class="w-4 h-4 rounded cursor-pointer p-0 bg-transparent">
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <label class="flex items-center gap-1 cursor-pointer font-semibold">
+                      <input type="checkbox" id="mAgOutlineToggle" class="rounded text-emerald-600">
+                      <span>白フチ取り</span>
+                    </label>
+                    <input type="color" id="mAgOutlinePicker" value="#ffffff"
+                      class="w-4 h-4 rounded cursor-pointer p-0 bg-transparent">
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-1.5 bg-white p-1.5 rounded border border-slate-200 text-[10px]">
+                  <div class="flex items-center justify-between">
+                    <label class="flex items-center gap-1 cursor-pointer font-semibold">
+                      <input type="checkbox" id="mAgPillToggle" class="rounded text-emerald-600">
+                      <span>円形座布団</span>
+                    </label>
+                    <input type="color" id="mAgPillPicker" value="#d1fae5"
+                      class="w-4 h-4 rounded cursor-pointer p-0 bg-transparent">
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <label class="flex items-center gap-1 cursor-pointer font-semibold">
+                      <input type="checkbox" id="mAgShadowToggle" class="rounded text-indigo-600">
+                      <span>落ち影</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ナビゲーション ＆ 完了ボタン -->
+          <div class="pt-3 border-t border-slate-200 space-y-2">
+            <div class="flex items-center justify-between gap-2 text-xs">
+              <button id="mStudioPrevItemBtn"
+                class="flex-1 bg-white hover:bg-slate-100 text-slate-700 font-bold py-1.5 rounded-lg border transition">◀
+                前のボタン</button>
+              <button id="mStudioNextItemBtn"
+                class="flex-1 bg-white hover:bg-slate-100 text-slate-700 font-bold py-1.5 rounded-lg border transition">次のボタン
+                ▶</button>
+            </div>
+            <button id="mStudioSaveAndCloseBtn"
+              class="w-full bg-[#00C300] hover:bg-[#00ad00] text-white font-bold py-2.5 rounded-xl shadow-md transition text-xs sm:text-sm flex items-center justify-center gap-1.5">
+              <span>✅ 変更を保存して完了</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // 0. B, D, E 素材の300px未満アラート判定
+    // =========================================================================
+    function checkBDEImageResolution(key, width, height, labelText = "") {
+      const isBDE = key.startsWith("B_") || key.startsWith("pass_") || key.startsWith("profile_");
+      if (!isBDE) return;
+
+      if (width < 300 || height < 300) {
+        const name = labelText ? `【${labelText}】` : "";
+        alert(`⚠️ 解像度アラート ${name}\n\nトリミング後のサイズが「${width} × ${height} px」です。\n300pxを下回っているため、LINE着せかえの公式規格化や高解像度端末で表示した際に画像が粗くぼやける可能性があります。\n\n※このまま作業を続けることも可能ですが、枠を広げるか、より高解像度の画像素材からの切り出しを推奨します。`);
+      }
+    }
+
+    // =========================================================================
+    // 1. IndexedDB データベース管理
+    // =========================================================================
+    const DB_NAME = "LineThemeCreatorDB";
+    const STORE_NAME = "project_state";
+    let dbInstance = null;
+
+    function initDB() {
+      return new Promise((resolve) => {
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(STORE_NAME)) {
+            db.createObjectStore(STORE_NAME, {keyPath: "id"});
+          }
+        };
+        req.onsuccess = (e) => {
+          dbInstance = e.target.result;
+          resolve(dbInstance);
+        };
+        req.onerror = () => resolve(null);
+      });
+    }
+
+    async function saveToDB() {
+      if (!dbInstance) return;
+      const statusEl = document.getElementById("saveStatus");
+      statusEl.textContent = "💾 保存中...";
+
+      const cleanAssets = {};
+      for (const [k, v] of Object.entries(state.assets)) {
+        if (v && (v.img || v.autoGenFrom || v.rawSourceImg)) {
+          cleanAssets[k] = {
+            dataUrl: v.img ? v.img.src : null,
+            rawSourceDataUrl: v.rawSourceImg ? v.rawSourceImg.src : null,
+            cropConfig: v.cropConfig || null,
+            maskDataUrl: v.maskDataUrl || null,
+            filename: v.filename || "image.png",
+            filesize: v.filesize || "",
+            mode: v.mode,
+            forceOpaque: v.forceOpaque,
+            specsConfig: v.specsConfig,
+            autoGen: v.autoGen,
+            autoGenFrom: v.autoGenFrom,
+            customUploaded: v.customUploaded
+          };
+        }
+      }
+
+      const tx = dbInstance.transaction(STORE_NAME, "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      store.put({
+        id: "current",
+        updatedAt: new Date().toLocaleTimeString(),
+        currentTab: state.currentTab,
+        currentView: state.currentView,
+        currentDevice: state.currentDevice,
+        talkBgColor: state.talkBgColor,
+        studioSourceDataUrl: studioState.sourceImg ? studioState.sourceImg.src : null,
+        assets: cleanAssets
+      });
+
+      tx.oncomplete = () => {
+        statusEl.textContent = "☁️ 自動保存済";
+      };
+    }
+
+    async function loadFromDB() {
+      if (!dbInstance) return false;
+      return new Promise((resolve) => {
+        const tx = dbInstance.transaction(STORE_NAME, "readonly");
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.get("current");
+        req.onsuccess = async () => {
+          const data = req.result;
+          if (!data) {resolve(false); return;}
+
+          state.currentTab = data.currentTab || "A";
+          state.currentView = data.currentView || "home";
+          state.currentDevice = data.currentDevice || "ios";
+          if (data.talkBgColor) state.talkBgColor = data.talkBgColor;
+
+          if (data.studioSourceDataUrl) {
+            const sImg = new Image();
+            sImg.src = data.studioSourceDataUrl;
+            studioState.sourceImg = sImg;
+          }
+
+          if (data.assets) {
+            for (const [k, v] of Object.entries(data.assets)) {
+              let img = null;
+              if (v.dataUrl) {
+                img = new Image();
+                await new Promise((r) => {
+                  img.onload = () => r();
+                  img.onerror = () => r();
+                  img.src = v.dataUrl;
+                });
+              }
+              let rawSourceImg = null;
+              if (v.rawSourceDataUrl) {
+                rawSourceImg = new Image();
+                await new Promise((r) => {
+                  rawSourceImg.onload = () => r();
+                  rawSourceImg.onerror = () => r();
+                  rawSourceImg.src = v.rawSourceDataUrl;
+                });
+              }
+              state.assets[k] = {
+                img,
+                rawSourceImg: rawSourceImg || img,
+                cropConfig: v.cropConfig || {scale: 100, x: 0, y: 0},
+                maskDataUrl: v.maskDataUrl || null,
+                filename: v.filename,
+                filesize: v.filesize,
+                mode: v.mode,
+                forceOpaque: v.forceOpaque,
+                specsConfig: v.specsConfig,
+                autoGen: v.autoGen,
+                autoGenFrom: v.autoGenFrom,
+                customUploaded: v.customUploaded
+              };
+            }
+          }
+          resolve(true);
+        };
+        req.onerror = () => resolve(false);
+      });
+    }
+
+    async function clearDB() {
+      if (!dbInstance) return;
+      const tx = dbInstance.transaction(STORE_NAME, "readwrite");
+      tx.objectStore(STORE_NAME).clear();
+    }
+
+    let saveTimeout = null;
+    function triggerAutoSave() {
+      clearTimeout(saveTimeout);
+      saveTimeout = setTimeout(saveToDB, 600);
+    }
+
+    // =========================================================================
+    // 2. LINE着せかえ公式規格マスタ定義
+    // =========================================================================
+    const SECTIONS = {
+      A: {
+        id: "A", name: "メイン画像", count: 1, sub: "計3枚",
+        desc: "元画像1枚をアップロードすると、iPhone用、Android用、STORE用に自動配置・個別調整できます（非透過自動合成済）。",
+        items: [
+          {
+            id: "main", label: "メイン画像 (共通元画像)",
+            note: "ストア・着せかえ一覧のメイン画像です。",
+            mode: "cover",
+            forceOpaque: true,
+            specs: [
+              {targetKey: "ios", os: "iPhone (iOS)", file: "ios_thumbnail.png", w: 200, h: 284},
+              {targetKey: "android", os: "Android", file: "android_thumbnail.png", w: 136, h: 202},
+              {targetKey: "store", os: "LINE STORE", file: "store_thumbnail.png", w: 198, h: 278}
+            ]
+          }
+        ]
+      },
+      B: {
+        id: "B", name: "メニューボタン", count: 9, sub: "基本5種 + 追加4種",
+        desc: "実機プレビューはLINE公式仕様の【基本5アイコン】で表示されます。専用スタジオからON/OFFを切り替えてじっくり調整できます。",
+        items: [
+          {id: "B_home", label: "1. ホーム (基本)", isCore: true, offKey: "i_29", onKey: "i_30"},
+          {id: "B_talk", label: "2. トーク (基本)", isCore: true, offKey: "i_03", onKey: "i_04"},
+          {id: "B_voom", label: "3. VOOM (基本)", isCore: true, offKey: "i_33", onKey: "i_34"},
+          {id: "B_news", label: "6. ニュース (基本)", isCore: true, offKey: "i_25", onKey: "i_26"},
+          {id: "B_wallet", label: "8. ウォレット (基本)", isCore: true, offKey: "i_27", onKey: "i_28"},
+          {id: "B_shopping", label: "4. ショッピング (追加)", isCore: false, offKey: "i_35", onKey: "i_36"},
+          {id: "B_call", label: "5. 通話 (追加)", isCore: false, offKey: "i_07", onKey: "i_08"},
+          {id: "B_today", label: "7. TODAY (追加)", isCore: false, offKey: "i_31", onKey: "i_32"},
+          {id: "B_app", label: "9. アプリ (追加)", isCore: false, offKey: "i_37", onKey: "i_38"}
+        ]
+      },
+      C: {
+        id: "C", name: "メニュー背景", count: 1, sub: "1枚",
+        desc: "下部バー背景画像（1472×150px）です。元画像1枚を登録して微調整してください。横リピート配置されます。",
+        items: [
+          {
+            id: "menu_bg", label: "メニュー背景",
+            mode: "cover",
+            specs: [
+              {targetKey: "common", os: "共通規格", file: "i_11.png", w: 1472, h: 150}
+            ]
+          }
+        ]
+      },
+      D: {
+        id: "D", name: "パスコード", count: 4, sub: "4桁 × OFF/ON (計16ファイル)",
+        desc: "各桁のOFF/ONが横並びです。切り出すとiOSとAndroidに完全連動します。",
+        items: [
+          {id: "pass_0", label: "1桁目", offIos: "i_12.png", onIos: "i_13.png", offAnd: "a_12.png", onAnd: "a_13.png"},
+          {id: "pass_1", label: "2桁目", offIos: "i_14.png", onIos: "i_15.png", offAnd: "a_14.png", onAnd: "a_15.png"},
+          {id: "pass_2", label: "3桁目", offIos: "i_16.png", onIos: "i_17.png", offAnd: "a_16.png", onAnd: "a_17.png"},
+          {id: "pass_3", label: "4桁目", offIos: "i_18.png", onIos: "i_19.png", offAnd: "a_18.png", onAnd: "a_19.png"}
+        ]
+      },
+      E: {
+        id: "E", name: "プロフィール画像", count: 2, sub: "計4ファイル",
+        desc: "元画像1枚から iPhone用(240×240) と Android用(247×247) を自動連動で微調整できます。",
+        items: [
+          {
+            id: "profile_personal", label: "個人用 デフォルトアイコン",
+            mode: "cover",
+            specs: [
+              {targetKey: "ios", os: "iPhone (iOS)", file: "i_20.png", w: 240, h: 240},
+              {targetKey: "android", os: "Android", file: "a_20.png", w: 247, h: 247}
+            ]
+          },
+          {
+            id: "profile_group", label: "グループ用 デフォルトアイコン",
+            mode: "cover",
+            specs: [
+              {targetKey: "ios", os: "iPhone (iOS)", file: "i_21.png", w: 240, h: 240},
+              {targetKey: "android", os: "Android", file: "a_21.png", w: 247, h: 247}
+            ]
+          }
+        ]
+      },
+      F: {
+        id: "F", name: "トーク背景", count: 1, sub: "計2ファイル",
+        desc: "元画像1枚から iPhone用(1482×1334) と Android用(1300×1300) を中央下揃え基準で個別に切り出せます。",
+        items: [
+          {
+            id: "talk_bg", label: "トークルーム背景",
+            mode: "bottom-cover",
+            specs: [
+              {targetKey: "ios", os: "iPhone (iOS)", file: "i_22.png", w: 1482, h: 1334},
+              {targetKey: "android", os: "Android", file: "a_22.png", w: 1300, h: 1300}
+            ]
+          }
+        ]
+      }
+    };
+
+    const state = {
+      currentTab: "A",
+      currentView: "home",
+      currentDevice: "ios",
+      activeButtonKey: "B_home",
+      showBadgeGuide: false,
+      talkBgColor: "#edf8fb",
+      assets: {}
+    };
+
+    // =========================================================================
+    // 3. アプリ初期化＆タブ構築
+    // =========================================================================
+    async function init() {
+      await initDB();
+      const restored = await loadFromDB();
+
+      buildTabs();
+      bindDeviceViewButtons();
+      setupMobileModal();
+      setupCropperStudio();
+      setupMenuButtonStudio();
+      switchTab(state.currentTab);
+
+      if (restored) {
+        document.getElementById("saveStatus").textContent = "☁️ 前回データを復元";
+      } else {
+        document.getElementById("saveStatus").textContent = "☁️ 自動保存待機";
+      }
+
+      renderPreview();
+    }
+
+    function buildTabs() {
+      const c = document.getElementById("tabContainer");
+      const tabIcons = {A: "🖼", B: "🔘", C: "🎨", D: "🔒", E: "👤", F: "💬"};
+      c.innerHTML = Object.keys(SECTIONS).map(key => {
+        const s = SECTIONS[key];
+        return `<button class="tab-btn ${state.currentTab === key ? 'active' : ''}" data-tab="${key}">
+      ${tabIcons[key]} ${key}. ${s.name}
+    </button>`;
+      }).join("");
+
+      c.querySelectorAll(".tab-btn").forEach(btn => {
+        btn.onclick = () => switchTab(btn.dataset.tab);
+      });
+    }
+
+    function switchTab(key) {
+      state.currentTab = key;
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === key));
+
+      const s = SECTIONS[key];
+      document.getElementById("sectionTitle").innerHTML = `
+    <span class="bg-emerald-600 text-white text-[10px] px-1.5 py-0.5 rounded font-mono">${s.id}</span>
+    ${s.name} <span class="text-[9px] text-slate-500 font-normal">(${s.sub})</span>
+  `;
+      document.getElementById("sectionDesc").textContent = s.desc;
+
+      const quickBar = document.getElementById("quickJumpBar");
+      if (key === "B") {
+        quickBar.classList.remove("hidden");
+        const coreBtns = SECTIONS.B.items.filter(i => i.isCore).map(item => `
+          <button class="px-1.5 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-800 whitespace-nowrap text-[9px] font-bold"
+                  onclick="document.getElementById('card_${item.id}').scrollIntoView({behavior:'smooth', block:'start'})">
+            ${item.label.split('.')[0]}
+          </button>
+        `).join("");
+
+        const extraBtns = SECTIONS.B.items.filter(i => !i.isCore).map(item => `
+          <button class="px-1.5 py-0.5 rounded bg-white hover:bg-slate-200 border border-slate-200 text-slate-600 whitespace-nowrap text-[9px] font-semibold"
+                  onclick="document.getElementById('card_${item.id}').scrollIntoView({behavior:'smooth', block:'start'})">
+            ${item.label.split('.')[0]}
+          </button>
+        `).join("");
+
+        document.getElementById("jumpButtons").innerHTML = `
+          <span class="text-[8px] text-emerald-700 font-bold">基本:</span> ${coreBtns}
+          <span class="text-[8px] text-slate-400 font-bold ml-1">追加:</span> ${extraBtns}
+        `;
+
+        document.getElementById("openMenuStudioGlobalBtn").onclick = () => {
+          openMenuButtonStudio(state.activeButtonKey || "B_home");
+        };
+
+        document.getElementById("copyBaseToSelectedBtn").onclick = openCopyBaseDialog;
+
+        document.getElementById("copyHomeOnToAllBtn").onclick = () => {
+          const homeOn = state.assets["B_home_on"];
+          if (!homeOn || !homeOn.autoGen || !homeOn.autoGen.enabled) {
+            alert("まずは1. ホームのON側で「✨ 全部盛りON加工エフェクト」を有効化して調整してください。");
+            return;
+          }
+          const targetConfig = JSON.parse(JSON.stringify(homeOn.autoGen));
+          let count = 0;
+          SECTIONS.B.items.forEach(item => {
+            if (item.id === "B_home") return;
+            const off = state.assets[`${item.id}_off`];
+            if (off && (off.img || off.rawSourceImg)) {
+              applyAutoGenToItem(item.id, targetConfig);
+              count++;
+            }
+          });
+          renderSectionContent("B");
+          renderPreview();
+          triggerAutoSave();
+          alert(`1番の設定を他の ${count} 個のボタンに一括適用しました！`);
+        };
+      } else {
+        quickBar.classList.add("hidden");
+      }
+
+      if (key === "A" || key === "E") switchView("home");
+      else if (key === "B" || key === "C") switchView("menu");
+      else if (key === "D") switchView("passcode");
+      else if (key === "F") switchView("talk");
+
+      renderSectionContent(key);
+      triggerAutoSave();
+    }
+
+    function renderSectionContent(key) {
+      const container = document.getElementById("assetList");
+      const actionContainer = document.getElementById("sectionAction");
+      container.innerHTML = "";
+      actionContainer.innerHTML = "";
+
+      if (key === "D") {
+        actionContainer.innerHTML = `<button id="copyPasscodeBtn" class="text-[9px] bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold px-2 py-0.5 rounded transition">✨ 1桁目を全桁コピー</button>`;
+        document.getElementById("copyPasscodeBtn").onclick = copyPasscode1toAll;
+      } else if (key === "B") {
+        actionContainer.innerHTML = `
+      <label class="flex items-center gap-1 text-[10px] text-slate-600 cursor-pointer select-none">
+        <input type="checkbox" id="badgeToggle" ${state.showBadgeGuide ? 'checked' : ''} class="rounded text-emerald-600">
+        <span>バッジ表示</span>
+      </label>
+    `;
+        document.getElementById("badgeToggle").onchange = (e) => {
+          state.showBadgeGuide = e.target.checked;
+          renderPreview();
+        };
+      }
+
+      const s = SECTIONS[key];
+
+      if (key === "B") {
+        s.items.forEach(item => {
+          const row = document.createElement("div");
+          row.id = `card_${item.id}`;
+          row.className = `card border-l-4 ${item.isCore ? 'border-l-emerald-500 bg-emerald-50/20' : 'border-l-slate-300'} hover:border-emerald-600 transition`;
+          row.innerHTML = `
+        <div class="flex items-center justify-between mb-1.5 pb-1 border-b border-slate-100">
+          <div class="flex items-center gap-1.5">
+            <span class="w-4 h-4 rounded-full ${item.isCore ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'} flex items-center justify-center text-[9px] font-bold">
+              ${item.label.split('.')[0]}
+            </span>
+            <h3 class="font-bold text-xs text-slate-800">${item.label}</h3>
+          </div>
+          <button type="button" class="open-single-studio-btn text-[9px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2 py-0.5 rounded shadow-2xs transition" data-id="${item.id}">
+            🎛️ 専用スタジオで調整
+          </button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+          <div id="box_${item.id}_off"></div>
+          <div id="box_${item.id}_on"></div>
+        </div>
+      `;
+          container.appendChild(row);
+
+          row.querySelector(".open-single-studio-btn").onclick = () => {
+            openMenuButtonStudio(item.id);
+          };
+
+          createCompactUploader(row.querySelector(`#box_${item.id}_off`), {
+            key: `${item.id}_off`,
+            parentItemKey: item.id,
+            badgeText: "OFF (未選択)",
+            badgeColor: "bg-slate-100 text-slate-700",
+            mode: "bottom-contain",
+            specs: [
+              {targetKey: "ios26", os: "iOS 26", file: `${item.offKey}_g.png`, w: 80, h: 56},
+              {targetKey: "legacy", os: "従来/Android", file: `${item.offKey}.png`, w: 128, h: 150}
+            ]
+          });
+
+          createCompactUploader(row.querySelector(`#box_${item.id}_on`), {
+            key: `${item.id}_on`,
+            parentItemKey: item.id,
+            badgeText: "ON (選択時)",
+            badgeColor: "bg-emerald-100 text-emerald-800 font-bold",
+            mode: "bottom-contain",
+            isButtonOn: true,
+            pairedOffKey: `${item.id}_off`,
+            specs: [
+              {targetKey: "ios26", os: "iOS 26", file: `${item.onKey}_g.png`, w: 80, h: 56},
+              {targetKey: "legacy", os: "従来/Android", file: `${item.onKey}.png`, w: 128, h: 150}
+            ]
+          });
+        });
+      } else if (key === "D") {
+        s.items.forEach(item => {
+          const row = document.createElement("div");
+          row.className = "card border-l-4 border-l-indigo-500";
+          row.innerHTML = `
+        <div class="flex items-center justify-between mb-1.5 pb-1 border-b border-slate-100">
+          <h3 class="font-bold text-xs text-slate-800">${item.label}</h3>
+          <span class="text-[8px] text-slate-400 font-mono">OFF / ON 横並び</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+          <div id="box_${item.id}_off"></div>
+          <div id="box_${item.id}_on"></div>
+        </div>
+      `;
+          container.appendChild(row);
+
+          createCompactUploader(row.querySelector(`#box_${item.id}_off`), {
+            key: `${item.id}_off`,
+            badgeText: "OFF (未入力)",
+            badgeColor: "bg-slate-100 text-slate-700",
+            mode: "contain",
+            specs: [
+              {targetKey: "ios", os: "iPhone (iOS)", file: item.offIos, w: 120, h: 120},
+              {targetKey: "android", os: "Android", file: item.offAnd, w: 116, h: 116}
+            ]
+          });
+
+          createCompactUploader(row.querySelector(`#box_${item.id}_on`), {
+            key: `${item.id}_on`,
+            badgeText: "ON (入力済)",
+            badgeColor: "bg-indigo-100 text-indigo-800 font-bold",
+            mode: "contain",
+            specs: [
+              {targetKey: "ios", os: "iPhone (iOS)", file: item.onIos, w: 120, h: 120},
+              {targetKey: "android", os: "Android", file: item.onAnd, w: 116, h: 116}
+            ]
+          });
+        });
+      } else if (key === "F") {
+        const colorCard = document.createElement("div");
+        colorCard.className = "card bg-slate-50 border-emerald-200 mb-3";
+        colorCard.innerHTML = `
+      <div class="flex items-center justify-between mb-2">
+        <div>
+          <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+            🎨 トークルーム背景色 (カラースキン登録用)
+          </span>
+          <p class="text-[10px] text-slate-500 mt-0.5">
+            画像上部が切れる大画面端末用の設定です。画像から自動抽出した色、またはお好みの色を指定できます。
+          </p>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center gap-2 mt-2 bg-white p-2.5 rounded-lg border border-slate-200">
+        <div class="flex items-center gap-2">
+          <input type="color" id="talkColorPicker" value="${state.talkBgColor}" class="w-8 h-8 rounded border border-slate-300 cursor-pointer p-0 bg-transparent">
+          <input type="text" id="talkColorText" value="${state.talkBgColor}" class="font-mono text-xs font-bold uppercase w-24 px-2 py-1 border rounded bg-slate-50 text-slate-800 text-center">
+        </div>
+        <button id="copyColorCodeBtn" class="text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded transition flex items-center gap-1 shadow-xs">
+          📋 コードをコピー
+        </button>
+        <button id="reSampleColorBtn" class="text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded transition">
+          🔄 画像上端から再抽出
+        </button>
+        <span id="copyColorToast" class="text-[10px] text-emerald-600 font-bold hidden">コピーしました！</span>
+      </div>
+    `;
+        container.appendChild(colorCard);
+
+        const picker = colorCard.querySelector("#talkColorPicker");
+        const textInput = colorCard.querySelector("#talkColorText");
+        const copyBtn = colorCard.querySelector("#copyColorCodeBtn");
+        const reSampleBtn = colorCard.querySelector("#reSampleColorBtn");
+        const toast = colorCard.querySelector("#copyColorToast");
+
+        function updateColor(hex) {
+          if (!/^#[0-9A-Fa-f]{6}$/.test(hex)) return;
+          state.talkBgColor = hex.toLowerCase();
+          picker.value = state.talkBgColor;
+          textInput.value = state.talkBgColor.toUpperCase();
+          renderPreview();
+          triggerAutoSave();
+        }
+
+        picker.oninput = (e) => updateColor(e.target.value);
+        textInput.onchange = (e) => {
+          let val = e.target.value.trim();
+          if (!val.startsWith("#")) val = "#" + val;
+          updateColor(val);
+        };
+
+        copyBtn.onclick = () => {
+          navigator.clipboard.writeText(state.talkBgColor.toUpperCase());
+          toast.classList.remove("hidden");
+          setTimeout(() => toast.classList.add("hidden"), 1800);
+        };
+
+        reSampleBtn.onclick = () => {
+          const asset = state.assets["talk_bg"];
+          if (asset && asset.img) {
+            sampleColorFromTop(asset.img);
+          } else {
+            alert("まずは下の枠にトーク背景画像をアップロードしてください。");
+          }
+        };
+
+        s.items.forEach(item => {
+          const el = document.createElement("div");
+          el.className = "card";
+          container.appendChild(el);
+
+          createCompactUploader(el, {
+            key: item.id,
+            badgeText: item.label,
+            badgeColor: "bg-emerald-100 text-emerald-800 font-bold",
+            note: item.note,
+            mode: item.mode || "cover",
+            forceOpaque: item.forceOpaque || false,
+            specs: item.specs,
+            onImageLoaded: (img) => sampleColorFromTop(img)
+          });
+        });
+      } else {
+        s.items.forEach(item => {
+          const el = document.createElement("div");
+          el.className = "card";
+          container.appendChild(el);
+
+          createCompactUploader(el, {
+            key: item.id,
+            badgeText: item.label,
+            badgeColor: "bg-emerald-100 text-emerald-800 font-bold",
+            note: item.note,
+            mode: item.mode || "cover",
+            forceOpaque: item.forceOpaque || false,
+            specs: item.specs
+          });
+        });
+      }
+    }
+
+    function applyAutoGenToItem(itemId, genConfig) {
+      const offData = state.assets[`${itemId}_off`];
+      if (!offData || (!offData.img && !offData.rawSourceImg)) return;
+
+      if (!state.assets[`${itemId}_on`]) {
+        state.assets[`${itemId}_on`] = {
+          img: null,
+          rawSourceImg: null,
+          cropConfig: {scale: 100, x: 0, y: 0},
+          filename: `auto_on_${itemId}.png`,
+          mode: "bottom-contain",
+          forceOpaque: false,
+          specsConfig: [{scale: 100, x: 0, y: 0}, {scale: 100, x: 0, y: 0}]
+        };
+      }
+      const onData = state.assets[`${itemId}_on`];
+      onData.autoGenFrom = `${itemId}_off`;
+      onData.autoGen = JSON.parse(JSON.stringify(genConfig));
+      if (!onData.customUploaded) {
+        onData.img = offData.img;
+        onData.rawSourceImg = offData.rawSourceImg || offData.img;
+        onData.cropConfig = offData.cropConfig ? {...offData.cropConfig} : {scale: 100, x: 0, y: 0};
+        onData.maskDataUrl = offData.maskDataUrl || null;
+      }
+    }
+
+    function sampleColorFromTop(img) {
+      try {
+        const c = document.createElement("canvas");
+        const sampleW = 50, sampleH = 20;
+        c.width = sampleW; c.height = sampleH;
+        const ctx = c.getContext("2d");
+        ctx.drawImage(img, 0, 0, sampleW, sampleH);
+
+        const imgData = ctx.getImageData(0, 0, sampleW, sampleH).data;
+        let r = 0, g = 0, b = 0, count = 0;
+
+        for (let i = 0; i < imgData.length; i += 4) {
+          if (imgData[i + 3] > 64) {
+            r += imgData[i]; g += imgData[i + 1]; b += imgData[i + 2];
+            count++;
+          }
+        }
+
+        if (count > 0) {
+          r = Math.round(r / count);
+          g = Math.round(g / count);
+          b = Math.round(b / count);
+          const hex = "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+          state.talkBgColor = hex;
+
+          const picker = document.getElementById("talkColorPicker");
+          const textInput = document.getElementById("talkColorText");
+          if (picker) picker.value = hex;
+          if (textInput) textInput.value = hex.toUpperCase();
+
+          renderPreview();
+          triggerAutoSave();
+        }
+      } catch (err) {
+        console.warn("Color sample error:", err);
+      }
+    }
+
+    // =========================================================================
+    // 4. コンパクトアップローダーコンポーネント (ON特大プレビュー＆削除機能)
+    // =========================================================================
+    function createCompactUploader(parent, opt) {
+      if (!state.assets[opt.key]) {
+        state.assets[opt.key] = {
+          img: null,
+          rawSourceImg: null,
+          cropConfig: {scale: 100, x: 0, y: 0},
+          maskDataUrl: null,
+          customUploaded: false,
+          filename: "",
+          filesize: "",
+          mode: opt.mode,
+          forceOpaque: opt.forceOpaque,
+          autoGen: {
+            enabled: false,
+            scaleRatio: 90,
+            yShift: 0,
+            brightness: 100,
+            saturate: 100,
+            monochromeOff: false,
+            colorOverlayEnabled: false,
+            colorOverlayColor: "#00C300",
+            outlineEnabled: false,
+            outlineColor: "#ffffff",
+            outlineWidth: 2.5,
+            neonEnabled: false,
+            neonColor: "#00ffcc",
+            neonBlur: 14,
+            shadowEnabled: false,
+            shadowColor: "rgba(0,0,0,0.45)",
+            shadowBlur: 8,
+            shadowY: 3,
+            indicatorEnabled: false,
+            indicatorType: "bar",
+            indicatorColor: "#00C300",
+            pillEnabled: false,
+            pillShape: "circle",
+            pillColor: "rgba(0,195,0,0.18)"
+          },
+          autoGenFrom: null,
+          specsConfig: opt.specs.map(() => ({scale: 100, x: 0, y: 0}))
+        };
+      }
+      const data = state.assets[opt.key];
+
+      const pairedOff = opt.pairedOffKey ? state.assets[opt.pairedOffKey] : null;
+      const hasOffImage = pairedOff && (pairedOff.img || pairedOff.rawSourceImg);
+      const isAutoGenActive = opt.isButtonOn && data.autoGen && data.autoGen.enabled;
+
+      const specColumnsHtml = opt.specs.map((s, idx) => {
+        return `
+      <div class="bg-white border border-slate-200 rounded-lg p-1.5 flex flex-col justify-between shadow-xs">
+        <div>
+          <div class="flex items-center justify-between border-b pb-0.5 mb-1">
+            <span class="text-[9px] font-bold text-slate-700">${s.os}</span>
+            <span class="text-[8px] text-slate-400 font-mono">${s.w}×${s.h}</span>
+          </div>
+
+          <div class="open-detail-editor-trigger checker-bg border border-slate-200 rounded w-full h-16 flex items-center justify-center overflow-hidden mb-1.5 cursor-pointer hover:border-emerald-500 relative group"
+               data-idx="${idx}" title="クリックして大画面で調整">
+            <canvas class="spec-canvas-${idx} max-h-full max-w-full object-contain pointer-events-none"></canvas>
+            <div class="absolute inset-0 bg-black/40 text-white text-[9px] font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
+              🎛️ 調整
+            </div>
+          </div>
+
+          <button type="button" class="open-detail-editor-btn w-full bg-slate-100 hover:bg-emerald-50 hover:text-emerald-800 text-slate-700 border border-slate-200 rounded py-1 text-[9px] font-bold flex items-center justify-center gap-1 transition"
+                  data-idx="${idx}">
+            <span>🎛️ 調整</span>
+          </button>
+        </div>
+
+        <button type="button" class="spec-dl-btn mt-1.5 w-full text-[8px] font-bold bg-white hover:bg-emerald-50 hover:text-emerald-700 border border-slate-200 py-0.5 rounded transition"
+                data-idx="${idx}">
+          💾 ${s.file}
+        </button>
+      </div>
+    `;
+      }).join("");
+
+      const isRegistered = (data.img && !isAutoGenActive) || (isAutoGenActive && (hasOffImage || data.customUploaded));
+
+      parent.innerHTML = `
+    <div class="flex items-center justify-between gap-1 mb-1">
+      <span class="text-[9px] px-1.5 py-0.5 rounded ${opt.badgeColor || 'bg-slate-100'}">
+        ${opt.badgeText}
+      </span>
+      <div class="flex items-center gap-1">
+        <span class="status-badge text-[8px] px-1 py-0.2 rounded font-semibold ${isRegistered ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'}">
+          ${data.customUploaded ? '自作画像' : (isAutoGenActive ? '自動加工' : (data.img ? '済' : '未'))}
+        </span>
+      </div>
+    </div>
+
+    <!-- ドロップゾーン -->
+    <div class="drop-zone checker-bg p-1.5 text-center cursor-pointer relative min-h-[46px] flex items-center justify-center hover:border-emerald-500 transition">
+      <input type="file" accept="image/png,image/jpeg,image/webp" class="hidden file-input">
+      
+      <div class="empty-view ${isRegistered ? 'hidden' : 'flex'} items-center gap-1.5 pointer-events-none text-slate-500">
+        <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+        <span class="text-[9px] font-bold text-slate-700">元画像をアップロード</span>
+      </div>
+
+      <div class="loaded-view ${isRegistered ? 'flex' : 'hidden'} items-center justify-between w-full px-1">
+        <div class="flex items-center gap-1.5 min-w-0">
+          <div class="h-7 w-7 bg-white border rounded flex items-center justify-center overflow-hidden flex-shrink-0">
+            <canvas class="thumb-canvas h-full w-full object-contain"></canvas>
+          </div>
+          <div class="text-left min-w-0">
+            <p class="text-[9px] font-bold text-slate-800 truncate orig-filename max-w-[100px]">
+              ${data.customUploaded ? '自作ON画像' : (isAutoGenActive ? '✨ 全部盛りON加工' : (data.filename || '登録済'))}
+            </p>
+            <p class="text-[7px] text-slate-400 orig-size">
+              ${isAutoGenActive ? `加工稼働中` : (data.img ? `${data.img.naturalWidth}×${data.img.naturalHeight}px` : '')}
+            </p>
+          </div>
+        </div>
+        <div class="flex items-center gap-1">
+          <button type="button" class="delete-asset-btn text-[8px] text-red-500 hover:text-red-700 font-bold px-1 py-0.5 rounded hover:bg-red-50 transition" title="この素材を削除して初期化">
+            🗑️ 削除
+          </button>
+          <span class="text-[8px] text-emerald-600 font-bold hover:underline whitespace-nowrap">変更</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="specs-preview-container ${isRegistered ? 'block' : 'hidden'} mt-1.5">
+      <div class="grid grid-cols-${opt.specs.length > 2 ? '3' : '2'} gap-1">
+        ${specColumnsHtml}
+      </div>
+    </div>
+  `;
+
+      const dropZone = parent.querySelector(".drop-zone");
+      const fileInput = parent.querySelector(".file-input");
+      const emptyView = parent.querySelector(".empty-view");
+      const loadedView = parent.querySelector(".loaded-view");
+      const thumbCanvas = parent.querySelector(".thumb-canvas");
+      const specsContainer = parent.querySelector(".specs-preview-container");
+      const statusBadge = parent.querySelector(".status-badge");
+      const deleteAssetBtn = parent.querySelector(".delete-asset-btn");
+
+      parent.querySelectorAll(".open-detail-editor-btn, .open-detail-editor-trigger").forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          if (opt.key.startsWith("B_")) {
+            const itemId = opt.parentItemKey || opt.key.split('_').slice(0, 2).join('_');
+            openMenuButtonStudio(itemId);
+          }
+        };
+      });
+
+      function drawThumbCanvas() {
+        if (!thumbCanvas) return;
+        thumbCanvas.width = 30; thumbCanvas.height = 30;
+        const ctx = thumbCanvas.getContext("2d");
+        ctx.clearRect(0, 0, 30, 30);
+        const sourceImg = (data.customUploaded && data.img) ? data.img : ((data.autoGen?.enabled && pairedOff) ? (pairedOff.img || pairedOff.rawSourceImg) : data.img);
+        if (sourceImg) {
+          drawCropToCanvas(thumbCanvas, sourceImg, 30, 30, 100, 0, 0, opt.mode, false, data.autoGen);
+        }
+      }
+
+      function redrawSingleSpec(idx) {
+        const s = opt.specs[idx];
+        const conf = data.specsConfig[idx] || {scale: 100, x: 0, y: 0};
+        const cv = parent.querySelector(`.spec-canvas-${idx}`);
+        if (!cv) return;
+
+        const sourceImg = (data.customUploaded && data.img) ? data.img : ((data.autoGen?.enabled && pairedOff) ? (pairedOff.img || pairedOff.rawSourceImg) : data.img);
+        if (sourceImg) {
+          drawCropToCanvas(cv, sourceImg, s.w, s.h, conf.scale, conf.x, conf.y, opt.mode, opt.forceOpaque, data.autoGen);
+        }
+      }
+
+      function redrawAllSpecs() {
+        drawThumbCanvas();
+        opt.specs.forEach((_, idx) => redrawSingleSpec(idx));
+      }
+
+      if (deleteAssetBtn) {
+        deleteAssetBtn.onclick = (e) => {
+          e.stopPropagation();
+          data.img = null;
+          data.rawSourceImg = null;
+          data.customUploaded = false;
+          data.filename = "";
+          renderSectionContent(state.currentTab);
+          renderPreview();
+          triggerAutoSave();
+        };
+      }
+
+      function handleFile(file) {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            data.rawSourceImg = img;
+            data.img = img;
+            data.cropConfig = {scale: 100, x: 0, y: 0};
+            data.maskDataUrl = null;
+            data.filename = file.name;
+            data.filesize = `${(file.size / 1024).toFixed(1)} KB`;
+            if (opt.isButtonOn) {
+              data.customUploaded = true;
+            }
+
+            if (opt.key.endsWith("_off")) {
+              const onKey = opt.key.replace("_off", "_on");
+              if (state.assets[onKey]) {
+                const onData = state.assets[onKey];
+                onData.img = img;
+                onData.rawSourceImg = img;
+                onData.cropConfig = {scale: 100, x: 0, y: 0};
+                onData.maskDataUrl = null;
+                onData.autoGenFrom = opt.key;
+              }
+            }
+
+            emptyView.classList.add("hidden");
+            loadedView.classList.remove("hidden");
+            specsContainer.classList.remove("hidden");
+            statusBadge.textContent = "済";
+            statusBadge.className = "status-badge text-[8px] px-1 py-0.2 rounded font-semibold bg-emerald-100 text-emerald-700";
+
+            if (opt.parentItemKey) state.activeButtonKey = opt.parentItemKey;
+
+            renderSectionContent(state.currentTab);
+            redrawAllSpecs();
+            if (opt.onImageLoaded) opt.onImageLoaded(img);
+            renderPreview();
+            triggerAutoSave();
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+
+      dropZone.onclick = () => {
+        if (opt.parentItemKey) state.activeButtonKey = opt.parentItemKey;
+        fileInput.click();
+      };
+      fileInput.onchange = () => handleFile(fileInput.files[0]);
+
+      dropZone.ondragover = (e) => {e.preventDefault(); dropZone.classList.add("dragover");};
+      dropZone.ondragleave = () => dropZone.classList.remove("dragover");
+      dropZone.ondrop = (e) => {
+        e.preventDefault();
+        dropZone.classList.remove("dragover");
+        if (opt.parentItemKey) state.activeButtonKey = opt.parentItemKey;
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+      };
+
+      parent.querySelectorAll(".spec-dl-btn").forEach(btn => {
+        btn.onclick = () => {
+          const idx = parseInt(btn.dataset.idx);
+          const spec = opt.specs[idx];
+          const conf = data.specsConfig[idx] || {scale: 100, x: 0, y: 0};
+          downloadSingleSpec(data, conf, spec.w, spec.h, spec.file, opt.mode, opt.forceOpaque);
+        };
+      });
+
+      if (isRegistered) {
+        redrawAllSpecs();
+      }
+    }
+
+    // =========================================================================
+    // ★★★ 5. メニューボタン専用スタジオ モーダル ロジック (リアルタイムON連動) ★★★
+    // =========================================================================
+    const menuStudioState = {
+      currentItemId: "B_home",
+      viewMode: "off",
+      editMode: "move",
+      bgMode: "checker",
+      eraserRadius: 24,
+      maskCanvas: null,
+      tapSimInterval: null,
+      isInteracting: false,
+      dragStartX: 0,
+      dragStartY: 0,
+      startConfX: 0,
+      startConfY: 0
+    };
+
+    // ★ 現在のOFF位置・消しゴムから「切り抜かれたキャラ単体」の一時Canvasを生成
+    function getStudioCroppedCharacterCanvas() {
+      const offAsset = state.assets[`${menuStudioState.currentItemId}_off`];
+      if (!offAsset) return null;
+      const sourceImg = offAsset.rawSourceImg || offAsset.img;
+      if (!sourceImg) return null;
+
+      const tempCv = document.createElement("canvas");
+      tempCv.width = 300;
+      tempCv.height = 300;
+      const ctx = tempCv.getContext("2d");
+
+      const conf = offAsset.cropConfig || {scale: 100, x: 0, y: 0};
+      drawCropToCanvas(tempCv, sourceImg, 300, 300, conf.scale, conf.x, conf.y, "contain", false);
+
+      if (menuStudioState.maskCanvas) {
+        ctx.save();
+        ctx.globalCompositeOperation = "destination-out";
+        ctx.drawImage(menuStudioState.maskCanvas, 0, 0);
+        ctx.restore();
+      }
+      return tempCv;
+    }
+
+    // ★ キャラクター単体に対してエフェクト（縮小・ネオン・フチ等）をダイレクト適用して描画
+    function renderCharacterWithEffects(ctx, charImg, w, h, ag) {
+      ctx.save();
+      const scale = (ag.scaleRatio || 90) / 100;
+      const yShift = (ag.yShift || 0) * (h / 100);
+
+      const dw = w * scale;
+      const dh = h * scale;
+      const dx = (w - dw) / 2;
+      const dy = (h - dh) / 2 + yShift;
+
+      // 1. 円形座布団
+      if (ag.pillEnabled) {
+        ctx.save();
+        ctx.fillStyle = ag.pillColor || "#d1fae5";
+        const r = Math.min(w, h) * 0.44;
+        ctx.beginPath();
+        ctx.arc(w / 2, (h / 2) + yShift, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // 2. 背景ネオン
+      if (ag.neonEnabled) {
+        ctx.save();
+        ctx.shadowColor = ag.neonColor || "#00ffcc";
+        ctx.shadowBlur = (ag.neonBlur || 16) * (w / 100);
+        ctx.drawImage(charImg, dx, dy, dw, dh);
+        ctx.drawImage(charImg, dx, dy, dw, dh);
+        ctx.restore();
+      }
+
+      // 3. ドロップシャドウ
+      if (ag.shadowEnabled) {
+        ctx.save();
+        ctx.shadowColor = ag.shadowColor || "rgba(0,0,0,0.45)";
+        ctx.shadowBlur = (ag.shadowBlur || 8) * (w / 100);
+        ctx.shadowOffsetY = (ag.shadowY || 3) * (h / 100);
+        ctx.drawImage(charImg, dx, dy, dw, dh);
+        ctx.restore();
+      }
+
+      // 4. 白フチ取り
+      if (ag.outlineEnabled) {
+        ctx.save();
+        const oCanvas = document.createElement("canvas");
+        oCanvas.width = dw; oCanvas.height = dh;
+        const oCtx = oCanvas.getContext("2d");
+        oCtx.drawImage(charImg, 0, 0, dw, dh);
+        oCtx.globalCompositeOperation = "source-in";
+        oCtx.fillStyle = ag.outlineColor || "#ffffff";
+        oCtx.fillRect(0, 0, dw, dh);
+
+        const outW = (ag.outlineWidth || 3.0) * (w / 100);
+        const steps = 12;
+        for (let i = 0; i < steps; i++) {
+          const angle = (i * 2 * Math.PI) / steps;
+          ctx.drawImage(oCanvas, dx + Math.cos(angle) * outW, dy + Math.sin(angle) * outW);
+        }
+        ctx.restore();
+      }
+
+      // 5. 本体描画
+      ctx.save();
+      if (ag.brightness || ag.saturate) {
+        ctx.filter = `brightness(${ag.brightness || 100}%) saturate(${ag.saturate || 100}%)`;
+      }
+      ctx.drawImage(charImg, dx, dy, dw, dh);
+      ctx.restore();
+
+      ctx.restore();
+    }
+
+    function ensureAgEnabled(onAsset) {
+      if (!onAsset.autoGen) {
+        onAsset.autoGen = {
+          enabled: true, scaleRatio: 90, yShift: 0, brightness: 100, saturate: 100,
+          monochromeOff: false, colorOverlayEnabled: false, colorOverlayColor: "#00C300",
+          outlineEnabled: false, outlineColor: "#ffffff", outlineWidth: 2.5,
+          neonEnabled: false, neonColor: "#00ffcc", neonBlur: 14,
+          shadowEnabled: false, shadowColor: "rgba(0,0,0,0.45)", shadowBlur: 8, shadowY: 3,
+          indicatorEnabled: false, indicatorType: "bar", indicatorColor: "#00C300",
+          pillEnabled: false, pillShape: "circle", pillColor: "#d1fae5"
+        };
+      }
+      onAsset.autoGen.enabled = true;
+    }
+
+    function setupMenuButtonStudio() {
+      const modal = document.getElementById("menuStudioModal");
+      const closeBtn = document.getElementById("closeMenuStudioBtn");
+      const saveBtn = document.getElementById("mStudioSaveAndCloseBtn");
+      const itemSelect = document.getElementById("menuStudioItemSelect");
+      const canvasWrapper = document.getElementById("mStudioCanvasWrapper");
+
+      const viewOffBtn = document.getElementById("mStudioViewOffBtn");
+      const viewOnBtn = document.getElementById("mStudioViewOnBtn");
+      const tapSimToggle = document.getElementById("mStudioTapSimToggle");
+
+      const tabOffBtn = document.getElementById("mStudioTabOffBtn");
+      const tabOnBtn = document.getElementById("mStudioTabOnBtn");
+      const panelOff = document.getElementById("mStudioPanelOff");
+      const panelOn = document.getElementById("mStudioPanelOn");
+
+      const modeMoveBtn = document.getElementById("mStudioModeMoveBtn");
+      const modeEraserBtn = document.getElementById("mStudioModeEraserBtn");
+      const eraserSizes = document.getElementById("mStudioEraserSizes");
+
+      const scaleRange = document.getElementById("mStudioScaleRange");
+      const xRange = document.getElementById("mStudioXRange");
+      const yRange = document.getElementById("mStudioYRange");
+      const centerBtn = document.getElementById("mStudioCenterBtn");
+      const resetBtn = document.getElementById("mStudioResetBtn");
+
+      const prevItemBtn = document.getElementById("mStudioPrevItemBtn");
+      const nextItemBtn = document.getElementById("mStudioNextItemBtn");
+
+      itemSelect.innerHTML = SECTIONS.B.items.map(it => `
+        <option value="${it.id}">${it.label}</option>
+      `).join("");
+
+      itemSelect.onchange = () => {
+        saveCurrentStudioItem();
+        loadItemIntoStudio(itemSelect.value);
+      };
+
+      prevItemBtn.onclick = () => {
+        saveCurrentStudioItem();
+        const curIdx = SECTIONS.B.items.findIndex(it => it.id === menuStudioState.currentItemId);
+        const prevIdx = (curIdx > 0) ? curIdx - 1 : SECTIONS.B.items.length - 1;
+        loadItemIntoStudio(SECTIONS.B.items[prevIdx].id);
+      };
+
+      nextItemBtn.onclick = () => {
+        saveCurrentStudioItem();
+        const curIdx = SECTIONS.B.items.findIndex(it => it.id === menuStudioState.currentItemId);
+        const nextIdx = (curIdx < SECTIONS.B.items.length - 1) ? curIdx + 1 : 0;
+        loadItemIntoStudio(SECTIONS.B.items[nextIdx].id);
+      };
+
+      // ✕ も保存と同じ扱い（スライダー等は state を直接更新するため、画像の確定と食い違わないようにする）
+      closeBtn.onclick = () => {
+        saveCurrentStudioItem();
+        stopTapSimulation();
+        modal.classList.remove("active");
+        modal.classList.add("pointer-events-none");
+        renderSectionContent("B");
+        renderPreview();
+        triggerAutoSave();
+      };
+
+      saveBtn.onclick = () => {
+        saveCurrentStudioItem();
+        stopTapSimulation();
+        modal.classList.remove("active");
+        modal.classList.add("pointer-events-none");
+        renderSectionContent("B");
+        renderPreview();
+        triggerAutoSave();
+      };
+
+      function setStudioViewMode(mode) {
+        menuStudioState.viewMode = mode;
+        const isOff = (mode === "off");
+
+        viewOffBtn.className = `px-3 py-1 rounded-md font-bold transition ${isOff ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`;
+        viewOnBtn.className = `px-3 py-1 rounded-md font-bold transition ${!isOff ? 'bg-white text-emerald-800 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`;
+
+        document.getElementById("mStudioModeBadge").textContent = isOff ? "🔘 OFF 編集枠" : "✨ ON プレビュー枠";
+        document.getElementById("mStudioModeBadge").className = `absolute bottom-2 right-2 text-[10px] text-white px-1.5 py-0.5 rounded font-bold ${isOff ? 'bg-emerald-600/90' : 'bg-indigo-600/90'}`;
+
+        document.getElementById("mStudioCurrentStateTag").textContent = isOff ? "OFF表示中" : "ON表示中";
+        document.getElementById("mStudioCurrentStateTag").className = `text-[8px] font-bold px-1.5 py-0.2 rounded font-mono ${isOff ? 'bg-emerald-100 text-emerald-800' : 'bg-indigo-100 text-indigo-800'}`;
+
+        drawMenuStudio();
+      }
+
+      // ★ OFF/ON の「タブ」と「表示状態(viewMode)」を常に一致させる共通関数（1〜9共通）
+      function setStudioTab(mode) {
+        const isOff = (mode === "off");
+        tabOffBtn.className = isOff
+          ? "flex-1 py-1.5 border-b-2 border-emerald-600 text-emerald-800 text-center"
+          : "flex-1 py-1.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800 text-center";
+        tabOnBtn.className = !isOff
+          ? "flex-1 py-1.5 border-b-2 border-emerald-600 text-emerald-800 text-center"
+          : "flex-1 py-1.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800 text-center";
+        panelOff.classList.toggle("hidden", !isOff);
+        panelOn.classList.toggle("hidden", isOff);
+        if (!isOff) {
+          const onAsset = state.assets[`${menuStudioState.currentItemId}_on`];
+          if (onAsset) ensureAgEnabled(onAsset);
+        }
+        setStudioViewMode(mode);
+      }
+
+      // ★ OFF側の編集操作（移動/拡大/センター/リセット/消しゴム）は必ずOFF表示で行う
+      function ensureOffEditing() {
+        stopTapSimulation();
+        if (menuStudioState.viewMode !== "off") setStudioTab("off");
+      }
+
+      viewOffBtn.onclick = () => {stopTapSimulation(); setStudioTab("off");};
+      viewOnBtn.onclick = () => {stopTapSimulation(); setStudioTab("on");};
+
+      function stopTapSimulation() {
+        if (menuStudioState.tapSimInterval) {
+          clearInterval(menuStudioState.tapSimInterval);
+          menuStudioState.tapSimInterval = null;
+        }
+        tapSimToggle.checked = false;
+      }
+
+      tapSimToggle.onchange = (e) => {
+        if (e.target.checked) {
+          menuStudioState.tapSimInterval = setInterval(() => {
+            const nextMode = (menuStudioState.viewMode === "off") ? "on" : "off";
+            setStudioViewMode(nextMode);
+          }, 600);
+        } else {
+          stopTapSimulation();
+        }
+      };
+
+      document.querySelectorAll(".bg-toggle-btn").forEach(btn => {
+        btn.onclick = () => {
+          menuStudioState.bgMode = btn.dataset.bg;
+          canvasWrapper.className = `relative rounded-2xl overflow-hidden border-2 border-emerald-500 shadow-inner flex items-center justify-center w-[300px] h-[300px] cursor-grab select-none touch-none ${btn.dataset.bg === 'white' ? 'bg-white' : btn.dataset.bg === 'black' ? 'bg-slate-950' : 'bg-slate-900 checker-bg'}`;
+          document.querySelectorAll(".bg-toggle-btn").forEach(b => b.className = "bg-toggle-btn px-2 py-0.5 rounded bg-white border border-slate-300 font-semibold");
+          btn.className = "bg-toggle-btn px-2 py-0.5 rounded bg-slate-800 text-white border border-slate-800 font-bold";
+        };
+      });
+
+      tabOffBtn.onclick = () => {stopTapSimulation(); setStudioTab("off");};
+      tabOnBtn.onclick = () => {stopTapSimulation(); setStudioTab("on");};
+
+      modeMoveBtn.onclick = () => {
+        menuStudioState.editMode = "move";
+        modeMoveBtn.className = "flex-1 py-1 rounded font-bold transition bg-white text-slate-900 shadow-xs";
+        modeEraserBtn.className = "flex-1 py-1 rounded font-bold transition text-slate-600 hover:text-slate-900";
+        eraserSizes.classList.add("hidden");
+        canvasWrapper.style.cursor = "grab";
+        document.getElementById("mStudioInstruction").innerHTML = "💡 画像を<b>ドラッグして移動</b> / <b>ホイールで拡大縮小</b>";
+      };
+
+      modeEraserBtn.onclick = () => {
+        menuStudioState.editMode = "eraser";
+        modeEraserBtn.className = "flex-1 py-1 rounded font-bold transition bg-white text-slate-900 shadow-xs";
+        modeMoveBtn.className = "flex-1 py-1 rounded font-bold transition text-slate-600 hover:text-slate-900";
+        eraserSizes.classList.remove("hidden");
+        canvasWrapper.style.cursor = "crosshair";
+        document.getElementById("mStudioInstruction").innerHTML = "🧹 なぞった部分を<b>透明に消去</b>します（頭の上の線などを直接消せます）";
+      };
+
+      document.querySelectorAll(".m-eraser-btn").forEach(btn => {
+        btn.onclick = () => {
+          menuStudioState.eraserRadius = parseInt(btn.dataset.size);
+          document.querySelectorAll(".m-eraser-btn").forEach(b => b.className = "m-eraser-btn px-2 py-0.5 rounded border border-slate-300 bg-white font-bold text-[10px]");
+          btn.className = "m-eraser-btn px-2 py-0.5 rounded border border-emerald-500 bg-emerald-50 text-emerald-800 font-bold text-[10px]";
+        };
+      });
+
+      scaleRange.oninput = (e) => {
+        ensureOffEditing();
+        const offAsset = state.assets[`${menuStudioState.currentItemId}_off`];
+        if (!offAsset) return;
+        offAsset.cropConfig.scale = parseInt(e.target.value);
+        document.getElementById("mStudioScaleVal").textContent = offAsset.cropConfig.scale + "%";
+        drawMenuStudio();
+      };
+
+      xRange.oninput = (e) => {
+        ensureOffEditing();
+        const offAsset = state.assets[`${menuStudioState.currentItemId}_off`];
+        if (!offAsset) return;
+        offAsset.cropConfig.x = parseInt(e.target.value);
+        document.getElementById("mStudioXVal").textContent = offAsset.cropConfig.x + "px";
+        drawMenuStudio();
+      };
+
+      yRange.oninput = (e) => {
+        ensureOffEditing();
+        const offAsset = state.assets[`${menuStudioState.currentItemId}_off`];
+        if (!offAsset) return;
+        offAsset.cropConfig.y = parseInt(e.target.value);
+        document.getElementById("mStudioYVal").textContent = offAsset.cropConfig.y + "px";
+        drawMenuStudio();
+      };
+
+      centerBtn.onclick = () => {
+        ensureOffEditing();
+        const offAsset = state.assets[`${menuStudioState.currentItemId}_off`];
+        if (!offAsset) return;
+        offAsset.cropConfig.x = 0;
+        offAsset.cropConfig.y = 0;
+        xRange.value = 0;
+        yRange.value = 0;
+        document.getElementById("mStudioXVal").textContent = "0px";
+        document.getElementById("mStudioYVal").textContent = "0px";
+        drawMenuStudio();
+      };
+
+      resetBtn.onclick = () => {
+        ensureOffEditing();
+        const offAsset = state.assets[`${menuStudioState.currentItemId}_off`];
+        if (!offAsset) return;
+        offAsset.cropConfig = {scale: 100, x: 0, y: 0};
+        offAsset.maskDataUrl = null;
+        if (menuStudioState.maskCanvas) {
+          const mCtx = menuStudioState.maskCanvas.getContext("2d");
+          mCtx.clearRect(0, 0, 300, 300);
+        }
+        syncStudioSliders();
+        drawMenuStudio();
+      };
+
+      function eraseAt(cx, cy) {
+        if (!menuStudioState.maskCanvas) return;
+        const rect = canvasWrapper.getBoundingClientRect();
+        const x = (cx - rect.left) * (300 / rect.width);
+        const y = (cy - rect.top) * (300 / rect.height);
+
+        const mCtx = menuStudioState.maskCanvas.getContext("2d");
+        mCtx.save();
+        mCtx.fillStyle = "#ff0000";
+        mCtx.beginPath();
+        mCtx.arc(x, y, menuStudioState.eraserRadius / 2, 0, Math.PI * 2);
+        mCtx.fill();
+        mCtx.restore();
+
+        drawMenuStudio();
+      }
+
+      function onPointerDown(e) {
+        ensureOffEditing();
+        menuStudioState.isInteracting = true;
+        const cx = e.clientX || (e.touches && e.touches[0].clientX);
+        const cy = e.clientY || (e.touches && e.touches[0].clientY);
+
+        if (menuStudioState.editMode === "eraser" && menuStudioState.viewMode === "off") {
+          eraseAt(cx, cy);
+        } else {
+          canvasWrapper.style.cursor = "grabbing";
+          menuStudioState.dragStartX = cx;
+          menuStudioState.dragStartY = cy;
+          const offAsset = state.assets[`${menuStudioState.currentItemId}_off`];
+          menuStudioState.startConfX = offAsset?.cropConfig.x || 0;
+          menuStudioState.startConfY = offAsset?.cropConfig.y || 0;
+        }
+        e.preventDefault();
+      }
+
+      function onPointerMove(e) {
+        if (!menuStudioState.isInteracting) return;
+        const cx = e.clientX || (e.touches && e.touches[0].clientX);
+        const cy = e.clientY || (e.touches && e.touches[0].clientY);
+
+        if (menuStudioState.editMode === "eraser" && menuStudioState.viewMode === "off") {
+          eraseAt(cx, cy);
+        } else {
+          const dx = Math.round(cx - menuStudioState.dragStartX);
+          const dy = Math.round(cy - menuStudioState.dragStartY);
+
+          const offAsset = state.assets[`${menuStudioState.currentItemId}_off`];
+          if (!offAsset) return;
+
+          offAsset.cropConfig.x = Math.max(-800, Math.min(800, menuStudioState.startConfX + dx));
+          offAsset.cropConfig.y = Math.max(-800, Math.min(800, menuStudioState.startConfY + dy));
+
+          xRange.value = offAsset.cropConfig.x;
+          yRange.value = offAsset.cropConfig.y;
+          document.getElementById("mStudioXVal").textContent = offAsset.cropConfig.x + "px";
+          document.getElementById("mStudioYVal").textContent = offAsset.cropConfig.y + "px";
+
+          drawMenuStudio();
+        }
+      }
+
+      function onPointerUp() {
+        menuStudioState.isInteracting = false;
+        if (menuStudioState.editMode === "move") canvasWrapper.style.cursor = "grab";
+      }
+
+      canvasWrapper.addEventListener("mousedown", onPointerDown);
+      window.addEventListener("mousemove", onPointerMove);
+      window.addEventListener("mouseup", onPointerUp);
+
+      canvasWrapper.addEventListener("touchstart", onPointerDown, {passive: false});
+      window.addEventListener("touchmove", onPointerMove, {passive: false});
+      window.addEventListener("touchend", onPointerUp);
+
+      canvasWrapper.addEventListener("wheel", (e) => {
+        if (menuStudioState.editMode === "eraser") return;
+        e.preventDefault();
+        ensureOffEditing();
+        const delta = e.deltaY < 0 ? 10 : -10;
+        const offAsset = state.assets[`${menuStudioState.currentItemId}_off`];
+        if (!offAsset) return;
+        offAsset.cropConfig.scale = Math.max(10, Math.min(1000, offAsset.cropConfig.scale + delta));
+        scaleRange.value = offAsset.cropConfig.scale;
+        document.getElementById("mStudioScaleVal").textContent = offAsset.cropConfig.scale + "%";
+        drawMenuStudio();
+      }, {passive: false});
+
+      // ★★★ ON設定操作時: 自動でエフェクトを有効化し、ON表示へ即座に連動！ ★★★
+      const agScale = document.getElementById("mAgScaleRange");
+      const agY = document.getElementById("mAgYRange");
+      const agNeon = document.getElementById("mAgNeonToggle");
+      const agNeonPicker = document.getElementById("mAgNeonPicker");
+      const agOutline = document.getElementById("mAgOutlineToggle");
+      const agOutlinePicker = document.getElementById("mAgOutlinePicker");
+      const agPill = document.getElementById("mAgPillToggle");
+      const agPillPicker = document.getElementById("mAgPillPicker");
+      const agShadow = document.getElementById("mAgShadowToggle");
+
+      function triggerOnEffectChange(callback) {
+        const onAsset = state.assets[`${menuStudioState.currentItemId}_on`];
+        if (!onAsset) return;
+        stopTapSimulation();
+        ensureAgEnabled(onAsset);
+        callback(onAsset.autoGen);
+        setStudioTab("on");
+      }
+
+      agScale.oninput = (e) => {
+        triggerOnEffectChange(ag => {
+          ag.scaleRatio = parseInt(e.target.value);
+          document.getElementById("mAgScaleVal").textContent = ag.scaleRatio + "%";
+        });
+      };
+
+      agY.oninput = (e) => {
+        triggerOnEffectChange(ag => {
+          ag.yShift = parseInt(e.target.value);
+          document.getElementById("mAgYVal").textContent = ag.yShift + "px";
+        });
+      };
+
+      agNeon.onchange = (e) => {
+        triggerOnEffectChange(ag => {ag.neonEnabled = e.target.checked;});
+      };
+      agNeonPicker.oninput = (e) => {
+        triggerOnEffectChange(ag => {ag.neonColor = e.target.value;});
+      };
+
+      agOutline.onchange = (e) => {
+        triggerOnEffectChange(ag => {ag.outlineEnabled = e.target.checked;});
+      };
+      agOutlinePicker.oninput = (e) => {
+        triggerOnEffectChange(ag => {ag.outlineColor = e.target.value;});
+      };
+
+      agPill.onchange = (e) => {
+        triggerOnEffectChange(ag => {ag.pillEnabled = e.target.checked;});
+      };
+      agPillPicker.oninput = (e) => {
+        triggerOnEffectChange(ag => {ag.pillColor = e.target.value;});
+      };
+
+      agShadow.onchange = (e) => {
+        triggerOnEffectChange(ag => {ag.shadowEnabled = e.target.checked;});
+      };
+
+      document.querySelectorAll(".m-preset-btn").forEach(btn => {
+        btn.onclick = () => {
+          const type = btn.dataset.preset;
+          triggerOnEffectChange(ag => {
+            Object.assign(ag, {
+              enabled: true, scaleRatio: 100, yShift: 0, brightness: 100, saturate: 100,
+              neonEnabled: false, outlineEnabled: false, pillEnabled: false, shadowEnabled: false
+            });
+
+            if (type === "press_in") Object.assign(ag, {scaleRatio: 90, yShift: 2, shadowEnabled: true});
+            else if (type === "neon_blue") Object.assign(ag, {scaleRatio: 92, neonEnabled: true, neonColor: "#00e5ff"});
+            else if (type === "neon_green") Object.assign(ag, {scaleRatio: 92, neonEnabled: true, neonColor: "#00ff7f"});
+            else if (type === "neon_pink") Object.assign(ag, {scaleRatio: 92, neonEnabled: true, neonColor: "#ff007f"});
+            else if (type === "outline_white") Object.assign(ag, {scaleRatio: 94, outlineEnabled: true, outlineColor: "#ffffff"});
+            else if (type === "jump_up") Object.assign(ag, {scaleRatio: 104, yShift: -4, shadowEnabled: true});
+          });
+          syncStudioOnPanel();
+        };
+      });
+    }
+
+    // =========================================================================
+    // ★ 1番をベースにコピー（複製）: 1番の完成状態を任意のメニューボタンへ独立コピー
+    // =========================================================================
+    const BASE_MENU_ID = SECTIONS.B.items[0].id;
+
+    function menuButtonHasContent(id) {
+      const o = state.assets[`${id}_off`];
+      const n = state.assets[`${id}_on`];
+      return !!((o && (o.img || o.rawSourceImg)) || (n && n.customUploaded));
+    }
+
+    function cloneImageElement(img) {
+      return new Promise(resolve => {
+        if (!img || !img.src) {resolve(img || null); return;}
+        const c = new Image();
+        c.onload = () => resolve(c);
+        c.onerror = () => resolve(img);
+        c.src = img.src;
+      });
+    }
+
+    // アセット1件を完全複製（Imageは再生成、オブジェクトはディープコピー。参照は一切共有しない）
+    async function cloneMenuAsset(src, imgCache) {
+      const out = {};
+      for (const [k, v] of Object.entries(src)) {
+        if (v instanceof HTMLImageElement) {
+          if (!imgCache.has(v)) imgCache.set(v, await cloneImageElement(v));
+          out[k] = imgCache.get(v);
+        } else if (v && typeof v === "object") {
+          out[k] = JSON.parse(JSON.stringify(v));
+        } else {
+          out[k] = v;
+        }
+      }
+      return out;
+    }
+
+    async function copyBaseMenuButtonTo(targetIds) {
+      const srcOff = state.assets[`${BASE_MENU_ID}_off`];
+      const srcOn = state.assets[`${BASE_MENU_ID}_on`];
+      if (!srcOff || (!srcOff.img && !srcOff.rawSourceImg)) return 0;
+
+      let count = 0;
+      for (const tid of targetIds) {
+        if (tid === BASE_MENU_ID || !SECTIONS.B.items.some(it => it.id === tid)) continue;
+        const imgCache = new Map();
+        const newOff = await cloneMenuAsset(srcOff, imgCache);
+        const newOn = srcOn ? await cloneMenuAsset(srcOn, imgCache) : null;
+        // コピー先自身のOFFを参照するように付け替える
+        if (newOn) newOn.autoGenFrom = `${tid}_off`;
+
+        state.assets[`${tid}_off`] = newOff;
+        if (newOn) {
+          state.assets[`${tid}_on`] = newOn;
+        } else {
+          delete state.assets[`${tid}_on`];
+          ensureMenuButtonAssets(tid);
+        }
+        count++;
+      }
+      return count;
+    }
+
+    function openCopyBaseDialog() {
+      const srcOff = state.assets[`${BASE_MENU_ID}_off`];
+      if (!srcOff || (!srcOff.img && !srcOff.rawSourceImg)) {
+        alert("まずは1番(ホーム)のOFF画像を登録・調整してください。");
+        return;
+      }
+      document.getElementById("copyBaseDialog")?.remove();
+
+      const baseLabel = SECTIONS.B.items[0].label;
+      const targets = SECTIONS.B.items.filter(it => it.id !== BASE_MENU_ID);
+      const overlay = document.createElement("div");
+      overlay.id = "copyBaseDialog";
+      overlay.className = "fixed inset-0 z-[60] bg-black/70 flex items-center justify-center p-3";
+      overlay.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+          <div class="bg-indigo-600 text-white px-4 py-3">
+            <h3 class="font-bold text-sm">📋 1番をベースにコピー</h3>
+            <p class="text-[10px] text-indigo-100 mt-0.5">コピー元: ${baseLabel}（複製後はコピー先が完全に独立します）</p>
+          </div>
+          <div class="p-3 text-xs">
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="font-bold text-slate-700">コピー先を選択</span>
+              <span class="flex gap-1">
+                <button type="button" id="copyBaseSelAll" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 font-semibold">全て選択</button>
+                <button type="button" id="copyBaseSelNone" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 font-semibold">全解除</button>
+              </span>
+            </div>
+            <div class="max-h-[50vh] overflow-y-auto space-y-1">
+              ${targets.map(it => `
+                <label class="flex items-center gap-2 px-2 py-1.5 rounded border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                  <input type="checkbox" class="copy-base-chk rounded" value="${it.id}">
+                  <span class="font-semibold text-slate-800">${it.label}</span>
+                  ${menuButtonHasContent(it.id) ? '<span class="ml-auto text-[9px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1">設定済み（上書き）</span>' : ''}
+                </label>`).join("")}
+            </div>
+          </div>
+          <div class="px-3 pb-3 flex justify-end gap-2 text-xs">
+            <button type="button" id="copyBaseCancel" class="px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200 font-bold">キャンセル</button>
+            <button type="button" id="copyBaseRun" class="px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white font-bold disabled:opacity-40" disabled>選択した項目にコピー</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+
+      const chks = () => [...overlay.querySelectorAll(".copy-base-chk")];
+      const runBtn = overlay.querySelector("#copyBaseRun");
+      const refresh = () => {runBtn.disabled = !chks().some(c => c.checked);};
+      chks().forEach(c => c.onchange = refresh);
+      overlay.querySelector("#copyBaseSelAll").onclick = () => {chks().forEach(c => c.checked = true); refresh();};
+      overlay.querySelector("#copyBaseSelNone").onclick = () => {chks().forEach(c => c.checked = false); refresh();};
+      overlay.querySelector("#copyBaseCancel").onclick = () => overlay.remove();
+      overlay.addEventListener("mousedown", (e) => {if (e.target === overlay) overlay.remove();});
+
+      runBtn.onclick = async () => {
+        const ids = chks().filter(c => c.checked).map(c => c.value);
+        if (!ids.length) return;
+        const overwrite = ids.filter(menuButtonHasContent);
+        if (overwrite.length && !confirm(`設定済みのボタン ${overwrite.length} 個を上書きします。よろしいですか？`)) return;
+        runBtn.disabled = true;
+        const n = await copyBaseMenuButtonTo(ids);
+        overlay.remove();
+        renderSectionContent("B");
+        renderPreview();
+        triggerAutoSave();
+        alert(`1番をベースに ${n} 個のボタンへ複製しました。以降は各ボタンを独立して編集できます。`);
+      };
+    }
+
+    function openMenuButtonStudio(itemId) {
+      const modal = document.getElementById("menuStudioModal");
+      modal.classList.add("active");
+      modal.classList.remove("pointer-events-none");
+      loadItemIntoStudio(itemId);
+    }
+
+    // ★ 1〜9共通: 指定ボタン自身の OFF/ON アセットを必ず用意して返す（他ボタンとは一切共有しない）
+    function ensureMenuButtonAssets(itemId) {
+      if (!state.assets[`${itemId}_off`]) {
+        state.assets[`${itemId}_off`] = {
+          img: null, rawSourceImg: null, cropConfig: {scale: 100, x: 0, y: 0},
+          maskDataUrl: null, mode: "bottom-contain", specsConfig: [{scale: 100, x: 0, y: 0}, {scale: 100, x: 0, y: 0}]
+        };
+      }
+      if (!state.assets[`${itemId}_on`]) {
+        state.assets[`${itemId}_on`] = {
+          img: null, rawSourceImg: null, cropConfig: {scale: 100, x: 0, y: 0},
+          mode: "bottom-contain", autoGenFrom: `${itemId}_off`, specsConfig: [{scale: 100, x: 0, y: 0}, {scale: 100, x: 0, y: 0}]
+        };
+      }
+      ensureAgEnabled(state.assets[`${itemId}_on`]);
+      return {offAsset: state.assets[`${itemId}_off`], onAsset: state.assets[`${itemId}_on`]};
+    }
+
+    function loadItemIntoStudio(itemId) {
+      menuStudioState.currentItemId = itemId;
+      document.getElementById("menuStudioItemSelect").value = itemId;
+
+      // 実機プレビューの選択ボタンを、編集中のボタンに合わせる（編集対象と選択状態の矛盾を防ぐ）
+      state.activeButtonKey = itemId;
+
+      const itemMeta = SECTIONS.B.items.find(it => it.id === itemId);
+      document.getElementById("menuStudioItemBadge").textContent = itemMeta ? itemMeta.label : itemId;
+
+      const {offAsset} = ensureMenuButtonAssets(itemId);
+
+      // マスクはボタンごとに新規Canvasを作り、そのボタンのOFF設定からだけ復元する
+      const maskCv = document.createElement("canvas");
+      maskCv.width = 300;
+      maskCv.height = 300;
+      menuStudioState.maskCanvas = maskCv;
+      if (offAsset.maskDataUrl) {
+        const mImg = new Image();
+        mImg.onload = () => {
+          // 読み込み中に別ボタンへ移動していたら破棄
+          if (menuStudioState.maskCanvas !== maskCv) return;
+          maskCv.getContext("2d").drawImage(mImg, 0, 0);
+          drawMenuStudio();
+        };
+        mImg.src = offAsset.maskDataUrl;
+      }
+
+      syncStudioSliders();
+      syncStudioOnPanel();
+      document.getElementById("mStudioModeMoveBtn").click();
+      document.getElementById("mStudioTabOffBtn").click();
+      drawMenuStudio();
+      renderPreview();
+    }
+
+    function syncStudioSliders() {
+      const offAsset = state.assets[`${menuStudioState.currentItemId}_off`];
+      const conf = offAsset?.cropConfig || {scale: 100, x: 0, y: 0};
+      document.getElementById("mStudioScaleRange").value = conf.scale;
+      document.getElementById("mStudioXRange").value = conf.x;
+      document.getElementById("mStudioYRange").value = conf.y;
+      document.getElementById("mStudioScaleVal").textContent = conf.scale + "%";
+      document.getElementById("mStudioXVal").textContent = conf.x + "px";
+      document.getElementById("mStudioYVal").textContent = conf.y + "px";
+    }
+
+    function syncStudioOnPanel() {
+      const onAsset = state.assets[`${menuStudioState.currentItemId}_on`];
+      const ag = onAsset?.autoGen || {enabled: true, scaleRatio: 90, yShift: 0};
+
+      document.getElementById("mAgScaleRange").value = ag.scaleRatio || 90;
+      document.getElementById("mAgScaleVal").textContent = (ag.scaleRatio || 90) + "%";
+      document.getElementById("mAgYRange").value = ag.yShift || 0;
+      document.getElementById("mAgYVal").textContent = (ag.yShift || 0) + "px";
+      document.getElementById("mAgNeonToggle").checked = !!ag.neonEnabled;
+      document.getElementById("mAgNeonPicker").value = ag.neonColor || "#00ffcc";
+      document.getElementById("mAgOutlineToggle").checked = !!ag.outlineEnabled;
+      document.getElementById("mAgOutlinePicker").value = ag.outlineColor || "#ffffff";
+      document.getElementById("mAgPillToggle").checked = !!ag.pillEnabled;
+      document.getElementById("mAgPillPicker").value = /^#[0-9a-fA-F]{6}$/.test(ag.pillColor || "") ? ag.pillColor : "#d1fae5";
+      document.getElementById("mAgShadowToggle").checked = !!ag.shadowEnabled;
+    }
+
+    function drawMenuStudio() {
+      const cv = document.getElementById("mStudioMainCanvas");
+      if (!cv) return;
+      cv.width = 300; cv.height = 300;
+      const ctx = cv.getContext("2d");
+      ctx.clearRect(0, 0, 300, 300);
+
+      const charCanvas = getStudioCroppedCharacterCanvas();
+      if (!charCanvas) {
+        ctx.fillStyle = "#94a3b8";
+        ctx.font = "12px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("画像がまだ登録されていません", 150, 150);
+        return;
+      }
+
+      const isViewingOn = (menuStudioState.viewMode === "on");
+      const onAsset = state.assets[`${menuStudioState.currentItemId}_on`];
+      const ag = onAsset?.autoGen;
+
+      if (isViewingOn && ag && ag.enabled) {
+        renderCharacterWithEffects(ctx, charCanvas, 300, 300, ag);
+      } else {
+        ctx.drawImage(charCanvas, 0, 0);
+      }
+
+      // 下部のミニ実機プレビュー（iOS 26 / Android）も下揃え連動描画
+      drawStudioMiniPreviews(charCanvas, isViewingOn ? ag : null);
+    }
+
+    function drawStudioMiniPreviews(charCanvas, ag) {
+      const iosCv = document.getElementById("mStudioPreviewIosCv");
+      const andCv = document.getElementById("mStudioPreviewAndCv");
+      if (!iosCv || !andCv || !charCanvas) return;
+
+      drawSingleMiniPreview(iosCv, charCanvas, 80, 56, ag);
+      drawSingleMiniPreview(andCv, charCanvas, 128, 150, ag);
+    }
+
+    function drawSingleMiniPreview(cv, charImg, targetW, targetH, ag) {
+      cv.width = targetW; cv.height = targetH;
+      const ctx = cv.getContext("2d");
+      ctx.clearRect(0, 0, targetW, targetH);
+
+      const padding = 0.94;
+      const aspect = charImg.width / charImg.height;
+      const targetAspect = targetW / targetH;
+      let dw, dh;
+      if (aspect > targetAspect) {
+        dw = targetW * padding;
+        dh = dw / aspect;
+      } else {
+        dh = targetH * padding;
+        dw = dh * aspect;
+      }
+
+      const dx = (targetW - dw) / 2;
+      const dy = targetH - dh - 2;
+
+      ctx.save();
+      if (ag && ag.enabled) {
+        const scale = (ag.scaleRatio || 90) / 100;
+        const dwEff = dw * scale;
+        const dhEff = dh * scale;
+        const dxEff = (targetW - dwEff) / 2;
+        const dyEff = targetH - dhEff - 2 + (ag.yShift || 0);
+
+        if (ag.neonEnabled) {
+          ctx.save();
+          ctx.shadowColor = ag.neonColor || "#00ffcc";
+          ctx.shadowBlur = (ag.neonBlur || 14) * (targetW / 100);
+          ctx.drawImage(charImg, dxEff, dyEff, dwEff, dhEff);
+          ctx.restore();
+        }
+        ctx.drawImage(charImg, dxEff, dyEff, dwEff, dhEff);
+      } else {
+        ctx.drawImage(charImg, dx, dy, dw, dh);
+      }
+      ctx.restore();
+    }
+
+    function saveCurrentStudioItem() {
+      const offAsset = state.assets[`${menuStudioState.currentItemId}_off`];
+      const onAsset = state.assets[`${menuStudioState.currentItemId}_on`];
+      if (!offAsset) return;
+
+      const sourceImg = offAsset.rawSourceImg || offAsset.img;
+      if (!sourceImg) return;
+
+      if (menuStudioState.maskCanvas) {
+        offAsset.maskDataUrl = menuStudioState.maskCanvas.toDataURL("image/png");
+      }
+
+      const croppedCanvas = cropSourceImageFromEditor(
+        sourceImg,
+        300, 300,
+        offAsset.cropConfig.scale,
+        offAsset.cropConfig.x,
+        offAsset.cropConfig.y,
+        menuStudioState.maskCanvas
+      );
+
+      const newImg = new Image();
+      newImg.onload = () => {
+        offAsset.img = newImg;
+        offAsset.specsConfig = [{scale: 100, x: 0, y: 0}, {scale: 100, x: 0, y: 0}];
+
+        if (onAsset) {
+          onAsset.img = newImg;
+          onAsset.rawSourceImg = sourceImg;
+          onAsset.cropConfig = {...offAsset.cropConfig};
+          onAsset.maskDataUrl = offAsset.maskDataUrl;
+          onAsset.autoGenFrom = `${menuStudioState.currentItemId}_off`;
+          onAsset.specsConfig = [{scale: 100, x: 0, y: 0}, {scale: 100, x: 0, y: 0}];
+        }
+
+        renderSectionContent("B");
+        renderPreview();
+        triggerAutoSave();
+      };
+      newImg.src = croppedCanvas.toDataURL("image/png");
+    }
+
+    function cropSourceImageFromEditor(sourceImg, targetW, targetH, scale, x, y, maskCanvas) {
+      const outSize = 400;
+      const outCanvas = document.createElement("canvas");
+      outCanvas.width = outSize;
+      outCanvas.height = outSize;
+      const ctx = outCanvas.getContext("2d");
+
+      drawCropToCanvas(outCanvas, sourceImg, outSize, outSize, scale, x, y, "contain", false);
+
+      if (maskCanvas) {
+        ctx.save();
+        ctx.globalCompositeOperation = "destination-out";
+        ctx.drawImage(maskCanvas, 0, 0, outSize, outSize);
+        ctx.restore();
+      }
+
+      checkBDEImageResolution(menuStudioState.currentItemId, outSize, outSize, menuStudioState.currentItemId);
+      return outCanvas;
+    }
+
+    // =========================================================================
+    // 6. トリミング＆高度エフェクト描画エンジン (下揃え完全接地対応)
+    // =========================================================================
+    function drawCropToCanvas(canvas, img, targetW, targetH, scale, x, y, mode, forceOpaque, autoGen, isOffMode = false) {
+      canvas.width = targetW;
+      canvas.height = targetH;
+      const ctx = canvas.getContext("2d");
+
+      if (forceOpaque) {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, targetW, targetH);
+      } else {
+        ctx.clearRect(0, 0, targetW, targetH);
+      }
+      if (!img) return;
+
+      if (isOffMode && autoGen && autoGen.monochromeOff) {
+        ctx.filter = "grayscale(100%) opacity(70%)";
+      }
+
+      const genRatio = (!isOffMode && autoGen && autoGen.enabled) ? (autoGen.scaleRatio / 100) : 1.0;
+      const sc = (scale / 100) * genRatio;
+
+      const imgAspect = img.naturalWidth / img.naturalHeight;
+      const targetAspect = targetW / targetH;
+      let dw, dh;
+
+      const isBottomContain = (mode === "bottom-contain");
+
+      if (mode === "contain" || isBottomContain) {
+        const padding = isBottomContain ? 0.96 : 0.88;
+        if (imgAspect > targetAspect) {
+          dw = targetW * padding * sc;
+          dh = dw / imgAspect;
+        } else {
+          dh = targetH * padding * sc;
+          dw = dh * imgAspect;
+        }
+      } else if (mode === "bottom-cover") {
+        if (imgAspect > targetAspect) {
+          dh = targetH * sc;
+          dw = dh * imgAspect;
+        } else {
+          dw = targetW * sc;
+          dh = dw / imgAspect;
+        }
+      } else {
+        if (imgAspect > targetAspect) {
+          dh = targetH * sc;
+          dw = dh * imgAspect;
+        } else {
+          dw = targetW * sc;
+          dh = dw / imgAspect;
+        }
+      }
+
+      const genYShift = (!isOffMode && autoGen && autoGen.enabled) ? (autoGen.yShift * (targetH / 100)) : 0;
+      const dx = (targetW - dw) / 2 + (x * (targetW / 100));
+      let dy;
+
+      if (mode === "bottom-cover") {
+        dy = (targetH - dh) + (y * (targetH / 100));
+      } else if (isBottomContain) {
+        const bottomMargin = targetH * 0.02;
+        dy = (targetH - dh - bottomMargin) + (y * (targetH / 100)) + genYShift;
+      } else {
+        dy = (targetH - dh) / 2 + (y * (targetH / 100)) + genYShift;
+      }
+
+      ctx.save();
+
+      if (!isOffMode && autoGen && autoGen.enabled && autoGen.pillEnabled) {
+        ctx.save();
+        ctx.fillStyle = autoGen.pillColor || "#d1fae5";
+        const r = Math.min(targetW, targetH) * 0.44;
+        ctx.beginPath();
+        ctx.arc(targetW / 2, isBottomContain ? (targetH - r - 4) : ((targetH / 2) + genYShift), r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      if (!isOffMode && autoGen && autoGen.enabled && autoGen.neonEnabled) {
+        ctx.shadowColor = autoGen.neonColor || "#00ffcc";
+        ctx.shadowBlur = (autoGen.neonBlur || 14) * (targetW / 100);
+        ctx.drawImage(img, dx, dy, dw, dh);
+        ctx.drawImage(img, dx, dy, dw, dh);
+      }
+
+      if (!isOffMode && autoGen && autoGen.enabled && autoGen.shadowEnabled) {
+        ctx.shadowColor = autoGen.shadowColor || "rgba(0,0,0,0.45)";
+        ctx.shadowBlur = (autoGen.shadowBlur || 8) * (targetW / 100);
+        ctx.shadowOffsetY = (autoGen.shadowY || 3) * (targetH / 100);
+        ctx.drawImage(img, dx, dy, dw, dh);
+      }
+
+      if (!isOffMode && autoGen && autoGen.enabled && autoGen.outlineEnabled) {
+        ctx.save();
+        const oCanvas = document.createElement("canvas");
+        oCanvas.width = dw; oCanvas.height = dh;
+        const oCtx = oCanvas.getContext("2d");
+        oCtx.drawImage(img, 0, 0, dw, dh);
+        oCtx.globalCompositeOperation = "source-in";
+        oCtx.fillStyle = autoGen.outlineColor || "#ffffff";
+        oCtx.fillRect(0, 0, dw, dh);
+
+        const outW = (autoGen.outlineWidth || 2.5) * (targetW / 100);
+        const steps = 12;
+        for (let i = 0; i < steps; i++) {
+          const angle = (i * 2 * Math.PI) / steps;
+          ctx.drawImage(oCanvas, dx + Math.cos(angle) * outW, dy + Math.sin(angle) * outW);
+        }
+        ctx.restore();
+      }
+
+      if (!isOffMode && autoGen && autoGen.enabled && autoGen.colorOverlayEnabled) {
+        ctx.save();
+        const colCanvas = document.createElement("canvas");
+        colCanvas.width = dw; colCanvas.height = dh;
+        const cCtx = colCanvas.getContext("2d");
+        cCtx.drawImage(img, 0, 0, dw, dh);
+        cCtx.globalCompositeOperation = "source-in";
+        cCtx.fillStyle = autoGen.colorOverlayColor || "#00C300";
+        cCtx.fillRect(0, 0, dw, dh);
+        ctx.shadowColor = "transparent";
+        ctx.drawImage(colCanvas, dx, dy);
+        ctx.restore();
+      } else {
+        if (!isOffMode && autoGen && autoGen.enabled) {
+          ctx.filter = `brightness(${autoGen.brightness || 100}%) saturate(${autoGen.saturate || 100}%)`;
+        }
+        ctx.shadowColor = "transparent";
+        ctx.drawImage(img, dx, dy, dw, dh);
+      }
+
+      if (!isOffMode && autoGen && autoGen.enabled && autoGen.indicatorEnabled) {
+        ctx.save();
+        ctx.fillStyle = autoGen.indicatorColor || "#00C300";
+        const bw = Math.min(targetW * 0.45, 32);
+        const bh = Math.max(3, targetH * 0.05);
+        const bx = (targetW - bw) / 2;
+        const by = targetH - bh - 2;
+        ctx.beginPath();
+        ctx.roundRect(bx, by, bw, bh, 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      ctx.restore();
+    }
+
+    function createCroppedBlob(assetData, conf, targetW, targetH, mode, forceOpaque, isOffMode = false, pairedOnAutoGen = null) {
+      return new Promise((resolve) => {
+        let sourceImg = assetData.img;
+        if (assetData.autoGen?.enabled && assetData.autoGenFrom && !assetData.customUploaded) {
+          const off = state.assets[assetData.autoGenFrom];
+          if (off && (off.img || off.rawSourceImg)) sourceImg = off.img || off.rawSourceImg;
+        }
+        if (!sourceImg) {resolve(null); return;}
+
+        const c = document.createElement("canvas");
+        const gen = isOffMode ? pairedOnAutoGen : assetData.autoGen;
+        drawCropToCanvas(c, sourceImg, targetW, targetH, conf.scale, conf.x, conf.y, mode, forceOpaque, gen, isOffMode);
+        c.toBlob(blob => resolve(blob), "image/png");
+      });
+    }
+
+    function downloadSingleSpec(assetData, conf, targetW, targetH, filename, mode, forceOpaque) {
+      createCroppedBlob(assetData, conf, targetW, targetH, mode, forceOpaque).then(blob => {
+        if (blob) saveAs(blob, filename);
+      });
+    }
+
+    function copyPasscode1toAll() {
+      const p0Off = state.assets["pass_0_off"];
+      const p0On = state.assets["pass_0_on"];
+      if (!p0Off || !p0Off.img) {
+        alert("まずは1桁目の未入力時(OFF)画像を登録してください。");
+        return;
+      }
+      for (let i = 1; i < 4; i++) {
+        state.assets[`pass_${i}_off`] = {
+          ...p0Off,
+          specsConfig: p0Off.specsConfig.map(c => ({...c}))
+        };
+        if (p0On && p0On.img) {
+          state.assets[`pass_${i}_on`] = {
+            ...p0On,
+            specsConfig: p0On.specsConfig.map(c => ({...c}))
+          };
+        }
+      }
+      renderSectionContent("D");
+      renderPreview();
+      triggerAutoSave();
+      alert("1桁目の素材と設定を2〜4桁目に一括適用しました！");
+    }
+
+    function getSpecDataForDevice(itemKey, specs, dev) {
+      const asset = state.assets[itemKey];
+      if (!asset) return null;
+
+      let sourceImg = asset.img;
+      if (!sourceImg && asset.autoGenFrom) {
+        const off = state.assets[asset.autoGenFrom];
+        if (off) sourceImg = off.img || off.rawSourceImg;
+      }
+      if (!sourceImg && itemKey.endsWith("_on")) {
+        const offKey = itemKey.replace("_on", "_off");
+        const off = state.assets[offKey];
+        if (off) sourceImg = off.img || off.rawSourceImg;
+      }
+      if (!sourceImg) return null;
+
+      let idx = 0;
+      if (dev === "android") {
+        const aIdx = specs.findIndex(s => s.targetKey === "android" || s.os.includes("Android"));
+        if (aIdx !== -1) idx = aIdx;
+      } else if (dev === "ios26") {
+        const i26Idx = specs.findIndex(s => s.targetKey === "ios26" || s.os.includes("iOS 26"));
+        if (i26Idx !== -1) idx = i26Idx;
+      } else {
+        const iIdx = specs.findIndex(s => s.targetKey === "ios" || s.targetKey === "legacy");
+        if (iIdx !== -1) idx = iIdx;
+      }
+
+      const spec = specs[idx];
+      const conf = (asset.specsConfig && asset.specsConfig[idx]) ? asset.specsConfig[idx] : {scale: 100, x: 0, y: 0};
+      return {asset, sourceImg, spec, conf};
+    }
+
+    // =========================================================================
+    // 7. 実機プレビューレンダリング (LINE公式仕様の基本5アイコン)
+    // =========================================================================
+    function getPreviewHTML(suffix = "") {
+      return `
+    <div class="flex items-center justify-between mb-2">
+      <div>
+        <h2 class="font-bold text-xs">実機プレビュー</h2>
+        <p class="text-[9px] text-slate-500">LINE公式仕様の基本5アイコン表示</p>
+      </div>
+      <div class="flex gap-0.5 bg-slate-100 p-0.5 rounded text-[10px] device-btns" data-suffix="${suffix}">
+        <button class="px-2 py-0.5 rounded font-bold transition ${state.currentDevice === 'ios' ? 'bg-white shadow-xs text-slate-900' : ''}" data-device="ios">iOS</button>
+        <button class="px-2 py-0.5 rounded font-bold transition ${state.currentDevice === 'android' ? 'bg-white shadow-xs text-slate-900' : ''}" data-device="android">Android</button>
+        <button class="px-2 py-0.5 rounded font-bold transition ${state.currentDevice === 'ios26' ? 'bg-white shadow-xs text-slate-900' : ''}" data-device="ios26">iOS 26</button>
+      </div>
+    </div>
+
+    <div class="flex gap-1 mb-2 text-[10px] view-btns" data-suffix="${suffix}">
+      <button class="flex-1 py-1 rounded border font-semibold ${state.currentView === 'home' ? 'bg-slate-800 text-white' : 'bg-white'}" data-view="home">ホーム</button>
+      <button class="flex-1 py-1 rounded border font-semibold ${state.currentView === 'talk' ? 'bg-slate-800 text-white' : 'bg-white'}" data-view="talk">トーク</button>
+      <button class="flex-1 py-1 rounded border font-semibold ${state.currentView === 'menu' ? 'bg-slate-800 text-white' : 'bg-white'}" data-view="menu">メニュー</button>
+      <button class="flex-1 py-1 rounded border font-semibold ${state.currentView === 'passcode' ? 'bg-slate-800 text-white' : 'bg-white'}" data-view="passcode">パス</button>
+    </div>
+
+    <div class="flex justify-center">
+      <div class="phone">
+        <div id="phoneScreen${suffix}" class="phone-screen"></div>
+      </div>
+    </div>
+
+    <div class="mt-2 pt-2 border-t border-slate-200">
+      <div class="flex items-center justify-between mb-1">
+        <span class="text-[10px] font-bold text-slate-700">iOS 26 視認性 (ホームOFF/ON)</span>
+        <span class="text-[8px] text-slate-400">ネオン・フチ・同化チェック</span>
+      </div>
+      <div class="grid grid-cols-2 gap-1">
+        <div class="rounded border bg-white p-1 text-center">
+          <span class="text-[8px] text-slate-400 block">白背景</span>
+          <div id="checkWhite${suffix}" class="h-8 flex items-center justify-center"></div>
+        </div>
+        <div class="rounded bg-slate-900 p-1 text-center">
+          <span class="text-[8px] text-slate-400 block">黒背景 (ネオン強調)</span>
+          <div id="checkBlack${suffix}" class="h-8 flex items-center justify-center"></div>
+        </div>
+      </div>
+    </div>
+  `;
+    }
+
+    function bindDeviceViewButtons() {
+      document.getElementById("previewContainerPC").innerHTML = getPreviewHTML("_pc");
+      document.getElementById("previewContainerMobile").innerHTML = getPreviewHTML("_mob");
+
+      document.querySelectorAll(".device-btns button").forEach(btn => {
+        btn.onclick = () => {
+          state.currentDevice = btn.dataset.device;
+          updateAllPreviewControls();
+          renderPreview();
+          triggerAutoSave();
+        };
+      });
+
+      document.querySelectorAll(".view-btns button").forEach(btn => {
+        btn.onclick = () => {
+          switchView(btn.dataset.view);
+          triggerAutoSave();
+        };
+      });
+    }
+
+    function updateAllPreviewControls() {
+      document.querySelectorAll(".device-btns button").forEach(b => {
+        const act = b.dataset.device === state.currentDevice;
+        b.classList.toggle("bg-white", act);
+        b.classList.toggle("shadow-xs", act);
+        b.classList.toggle("text-slate-900", act);
+      });
+      document.querySelectorAll(".view-btns button").forEach(b => {
+        const act = b.dataset.view === state.currentView;
+        b.classList.toggle("bg-slate-800", act);
+        b.classList.toggle("text-white", act);
+        b.classList.toggle("bg-white", !act);
+      });
+    }
+
+    function switchView(view) {
+      state.currentView = view;
+      updateAllPreviewControls();
+      renderPreview();
+    }
+
+    function setupMobileModal() {
+      const modal = document.getElementById("mobilePreviewModal");
+      const openBtn = document.getElementById("openMobilePreviewBtn");
+      const closeBtn = document.getElementById("closeMobilePreviewBtn");
+
+      openBtn.onclick = () => {
+        modal.classList.add("active");
+        modal.classList.remove("pointer-events-none");
+        renderPreview();
+      };
+
+      closeBtn.onclick = () => {
+        modal.classList.remove("active");
+        modal.classList.add("pointer-events-none");
+      };
+
+      modal.onclick = (e) => {
+        if (e.target === modal) closeBtn.click();
+      };
+    }
+
+    function renderPreview() {
+      renderScreenInstance("_pc");
+      renderScreenInstance("_mob");
+    }
+
+    function renderScreenInstance(suffix) {
+      const scr = document.getElementById(`phoneScreen${suffix}`);
+      if (!scr) return;
+
+      const view = state.currentView;
+      const dev = state.currentDevice;
+
+      scr.style.backgroundImage = "";
+      scr.style.backgroundRepeat = "";
+      scr.style.backgroundPosition = "";
+      scr.style.backgroundSize = "";
+      scr.style.backgroundColor = (view === "talk") ? state.talkBgColor : "#edf8fb";
+
+      if (view === "talk") {
+        const talkData = getSpecDataForDevice("talk_bg", SECTIONS.F.items[0].specs, dev);
+        scr.innerHTML = `
+      <canvas id="pvTalkCanvas${suffix}" class="absolute inset-0 w-full h-full object-cover pointer-events-none"></canvas>
+      <div class="relative z-10 flex flex-col h-full justify-between">
+        <div class="bg-white/90 backdrop-blur px-3 py-2 border-b border-slate-200 flex items-center justify-between text-[11px] font-bold">
+          <span>＜ トーク相手</span>
+          <span class="text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">背景: ${state.talkBgColor.toUpperCase()}</span>
+        </div>
+        <div class="p-3 space-y-2 flex-1">
+          <div class="inline-block bg-white rounded-xl rounded-tl-none px-3 py-1.5 text-[11px] shadow-sm max-w-[80%]">
+            着せかえトーク背景プレビュー
+          </div><br>
+          <div class="inline-block bg-emerald-500 text-white rounded-xl rounded-tr-none px-3 py-1.5 text-[11px] shadow-sm max-w-[80%] float-right">
+            [${dev.toUpperCase()}] 上部余白と色同化中✨
+          </div>
+        </div>
+        <div class="bg-white/95 border-t border-slate-200 p-2 flex items-center gap-1.5">
+          <span class="text-slate-400 text-xs">＋ 📷</span>
+          <div class="flex-1 bg-slate-100 rounded-full h-6 px-3 text-[10px] flex items-center text-slate-400">メッセージ</div>
+        </div>
+      </div>
+    `;
+        if (talkData) {
+          const tc = document.getElementById(`pvTalkCanvas${suffix}`);
+          drawCropToCanvas(tc, talkData.sourceImg, 290, 580, talkData.conf.scale, talkData.conf.x, talkData.conf.y, "bottom-cover", false);
+        }
+      } else if (view === "home") {
+        const profData = getSpecDataForDevice("profile_personal", SECTIONS.E.items[0].specs, dev);
+        const mainData = getSpecDataForDevice("main", SECTIONS.A.items[0].specs, dev);
+
+        scr.innerHTML = `
+      <div class="bg-white px-3 py-2 border-b font-bold text-xs">ホーム (${dev.toUpperCase()})</div>
+      <div class="p-4 text-center">
+        <div class="w-14 h-14 rounded-full overflow-hidden mx-auto bg-slate-200 border-2 border-white shadow flex items-center justify-center">
+          <canvas id="pvProfCanvas${suffix}" class="w-full h-full object-cover"></canvas>
+        </div>
+        <p class="font-bold text-xs mt-1.5 text-slate-800">ユーザー名</p>
+        <p class="text-[8px] text-slate-400 mt-0.5">ひとこと未設定</p>
+        
+        <div class="mt-2.5 p-2 bg-white rounded-xl shadow-xs border border-slate-100 inline-block">
+          <p class="text-[8px] text-slate-400 mb-0.5">メイン画像 [${dev.toUpperCase()}]</p>
+          <div class="w-18 h-26 rounded overflow-hidden mx-auto shadow-xs bg-slate-50 flex items-center justify-center">
+            <canvas id="pvMainCanvas${suffix}" class="w-full h-full object-cover"></canvas>
+          </div>
+        </div>
+      </div>
+    `;
+        if (profData) {
+          const pc = document.getElementById(`pvProfCanvas${suffix}`);
+          drawCropToCanvas(pc, profData.sourceImg, 100, 100, profData.conf.scale, profData.conf.x, profData.conf.y, "cover", false);
+        }
+        if (mainData) {
+          const mc = document.getElementById(`pvMainCanvas${suffix}`);
+          drawCropToCanvas(mc, mainData.sourceImg, mainData.spec.w, mainData.spec.h, mainData.conf.scale, mainData.conf.x, mainData.conf.y, "cover", true);
+        }
+      } else if (view === "passcode") {
+        scr.innerHTML = `
+      <div class="bg-white px-3 py-2 border-b font-bold text-xs">パスコード (${dev.toUpperCase()})</div>
+      <div class="p-4 text-center">
+        <p class="text-[10px] font-bold text-slate-700 mt-2">パスコードを入力</p>
+        <div class="grid grid-cols-4 gap-2 mt-8 px-2">
+          ${[0, 1, 2, 3].map(i => `
+            <div class="w-8 h-8 mx-auto flex items-center justify-center">
+              <canvas id="pvPassCanvas_${i}${suffix}" class="w-full h-full object-contain"></canvas>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    `;
+        [0, 1, 2, 3].forEach(i => {
+          const pData = getSpecDataForDevice(`pass_${i}_off`, [
+            {targetKey: "ios", os: "iOS", w: 120, h: 120},
+            {targetKey: "android", os: "Android", w: 116, h: 116}
+          ], dev);
+          const cv = document.getElementById(`pvPassCanvas_${i}${suffix}`);
+          if (pData) {
+            drawCropToCanvas(cv, pData.sourceImg, pData.spec.w, pData.spec.h, pData.conf.scale, pData.conf.x, pData.conf.y, "contain", false);
+          } else {
+            cv.width = 32; cv.height = 32;
+            const ctx = cv.getContext("2d");
+            ctx.strokeStyle = "#cbd5e1"; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.arc(16, 16, 9, 0, Math.PI * 2); ctx.stroke();
+          }
+        });
+      } else if (view === "menu") {
+        const menuBgData = getSpecDataForDevice("menu_bg", SECTIONS.C.items[0].specs, dev);
+        if (menuBgData) {
+          scr.style.backgroundImage = `url('${menuBgData.sourceImg.src}')`;
+          scr.style.backgroundRepeat = "repeat-x";
+          scr.style.backgroundPosition = "left bottom";
+          scr.style.backgroundSize = "auto 54px";
+        }
+
+        const DEFAULT_5_KEYS = ["B_home", "B_talk", "B_voom", "B_news", "B_wallet"];
+        let displayKeys = [...DEFAULT_5_KEYS];
+        if (state.activeButtonKey && !DEFAULT_5_KEYS.includes(state.activeButtonKey)) {
+          displayKeys[3] = state.activeButtonKey;
+        }
+        const previewItems = displayKeys.map(k => SECTIONS.B.items.find(it => it.id === k)).filter(Boolean);
+
+        scr.innerHTML = `
+      <div class="bg-white px-3 py-2 border-b font-bold text-xs flex items-center justify-between">
+        <span>メニュー (${dev.toUpperCase()})</span>
+        <span class="text-[8px] text-emerald-600 font-normal">緑枠: 選択中(ON表示)</span>
+      </div>
+      <div class="p-3 text-[9px] text-slate-500 text-center mt-8">
+        LINE公式仕様の<b>基本5アイコン表示</b>です。<br>タップしたボタンがONになり、下揃えで整列します。
+      </div>
+      <div class="absolute bottom-0 inset-x-0 h-14 bg-white/95 backdrop-blur-xs border-t border-slate-200 flex items-center justify-around px-0.5">
+        ${previewItems.map(item => {
+          const isCurrent = state.activeButtonKey === item.id;
+          return `
+            <div class="relative flex flex-col items-center justify-end pb-1 flex-1 h-12 rounded cursor-pointer ${isCurrent ? 'ring-1.5 ring-[#00C300] bg-emerald-50/60' : ''}"
+                 onclick="state.activeButtonKey='${item.id}'; renderPreview(); document.getElementById('card_${item.id}')?.scrollIntoView({behavior:'smooth', block:'start'});">
+              <div class="w-8 h-8 flex items-end justify-center mb-0.5">
+                <canvas id="pvMenuIcon_${item.id}${suffix}" class="max-w-full max-h-full object-contain pointer-events-none"></canvas>
+              </div>
+              <span class="text-[8px] text-slate-700 truncate max-w-[48px] text-center font-medium leading-none">${item.label.split('.')[1].replace('(基本)', '').replace('(追加)', '').trim()}</span>
+              ${state.showBadgeGuide ? `
+                <div class="absolute ${dev === 'ios26' ? 'top-0.5 right-1' : 'top-1 right-2'} w-2.5 h-2.5 bg-red-500 text-white rounded-full text-[6px] flex items-center justify-center font-bold">N</div>
+              ` : ''}
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `;
+
+        previewItems.forEach(item => {
+          const isSelected = (state.activeButtonKey === item.id);
+          const targetKey = isSelected ? `${item.id}_on` : `${item.id}_off`;
+          let btnData = getSpecDataForDevice(targetKey, [
+            {targetKey: "ios26", os: "iOS 26", w: 80, h: 56},
+            {targetKey: "legacy", os: "従来/Android", w: 128, h: 150}
+          ], dev);
+
+          const cv = document.getElementById(`pvMenuIcon_${item.id}${suffix}`);
+          if (cv && btnData) {
+            const pairedOn = state.assets[`${item.id}_on`];
+            const isOff = !isSelected;
+            drawCropToCanvas(cv, btnData.sourceImg, btnData.spec.w, btnData.spec.h, btnData.conf.scale, btnData.conf.x, btnData.conf.y, "bottom-contain", false, btnData.asset.autoGen, isOff && pairedOn?.autoGen);
+          } else if (cv) {
+            cv.width = 24; cv.height = 24;
+            const ctx = cv.getContext("2d");
+            ctx.fillStyle = "#e2e8f0";
+            ctx.fillRect(2, 2, 20, 20);
+          }
+        });
+      }
+
+      const activeIconKey = state.activeButtonKey ? `${state.activeButtonKey}_on` : "B_home_off";
+      let previewIconData = getSpecDataForDevice(activeIconKey, [
+        {targetKey: "ios26", os: "iOS 26", w: 80, h: 56},
+        {targetKey: "legacy", os: "従来/Android", w: 128, h: 150}
+      ], "ios26");
+
+      const wBox = document.getElementById(`checkWhite${suffix}`);
+      const bBox = document.getElementById(`checkBlack${suffix}`);
+      if (previewIconData) {
+        wBox.innerHTML = `<canvas id="checkWhiteCv${suffix}" class="max-h-7 max-w-9 object-contain"></canvas>`;
+        bBox.innerHTML = `<canvas id="checkBlackCv${suffix}" class="max-h-7 max-w-9 object-contain"></canvas>`;
+        drawCropToCanvas(document.getElementById(`checkWhiteCv${suffix}`), previewIconData.sourceImg, 80, 56, previewIconData.conf.scale, previewIconData.conf.x, previewIconData.conf.y, "bottom-contain", false, previewIconData.asset.autoGen);
+        drawCropToCanvas(document.getElementById(`checkBlackCv${suffix}`), previewIconData.sourceImg, 80, 56, previewIconData.conf.scale, previewIconData.conf.x, previewIconData.conf.y, "bottom-contain", false, previewIconData.asset.autoGen);
+      } else {
+        wBox.innerHTML = `<span class="text-[8px] text-slate-400">未登録</span>`;
+        bBox.innerHTML = `<span class="text-[8px] text-slate-400">未登録</span>`;
+      }
+    }
+
+    // =========================================================================
+    // 8. 大画像切り出しスタジオの実装
+    // =========================================================================
+    const studioState = {
+      sourceImg: null,
+      targetKey: "B_home_off",
+      boxRatio: 1.0,
+      boxX: 0,
+      boxY: 0,
+      boxSizePercent: 50,
+      canvasW: 600,
+      canvasH: 400
+    };
+
+    const ALL_STUDIO_TARGETS = [
+      {key: "B_home_off", label: "🔘 B: 1. ホーム (OFF)", ratio: 1.0, mode: "bottom-contain"},
+      {key: "B_home_on", label: "🔘 B: 1. ホーム (ON)", ratio: 1.0, mode: "bottom-contain"},
+      {key: "B_talk_off", label: "🔘 B: 2. トーク (OFF)", ratio: 1.0, mode: "bottom-contain"},
+      {key: "B_talk_on", label: "🔘 B: 2. トーク (ON)", ratio: 1.0, mode: "bottom-contain"},
+      {key: "B_voom_off", label: "🔘 B: 3. VOOM (OFF)", ratio: 1.0, mode: "bottom-contain"},
+      {key: "B_voom_on", label: "🔘 B: 3. VOOM (ON)", ratio: 1.0, mode: "bottom-contain"},
+      {key: "B_news_off", label: "🔘 B: 6. ニュース (OFF)", ratio: 1.0, mode: "bottom-contain"},
+      {key: "B_news_on", label: "🔘 B: 6. ニュース (ON)", ratio: 1.0, mode: "bottom-contain"},
+      {key: "B_wallet_off", label: "🔘 B: 8. ウォレット (OFF)", ratio: 1.0, mode: "bottom-contain"},
+      {key: "B_wallet_on", label: "🔘 B: 8. ウォレット (ON)", ratio: 1.0, mode: "bottom-contain"},
+      {key: "B_shopping_off", label: "🔘 B: 4. ショッピング (OFF)", ratio: 1.0, mode: "bottom-contain"},
+      {key: "B_shopping_on", label: "🔘 B: 4. ショッピング (ON)", ratio: 1.0, mode: "bottom-contain"},
+      {key: "B_call_off", label: "🔘 B: 5. 通話 (OFF)", ratio: 1.0, mode: "bottom-contain"},
+      {key: "B_call_on", label: "🔘 B: 5. 通話 (ON)", ratio: 1.0, mode: "bottom-contain"},
+      {key: "B_today_off", label: "🔘 B: 7. TODAY (OFF)", ratio: 1.0, mode: "bottom-contain"},
+      {key: "B_today_on", label: "🔘 B: 7. TODAY (ON)", ratio: 1.0, mode: "bottom-contain"},
+      {key: "B_app_off", label: "🔘 B: 9. アプリ (OFF)", ratio: 1.0, mode: "bottom-contain"},
+      {key: "B_app_on", label: "🔘 B: 9. アプリ (ON)", ratio: 1.0, mode: "bottom-contain"},
+      {key: "pass_0_off", label: "🔒 D: パスコード 1桁目 (OFF)", ratio: 1.0, mode: "contain"},
+      {key: "pass_0_on", label: "🔒 D: パスコード 1桁目 (ON)", ratio: 1.0, mode: "contain"},
+      {key: "pass_1_off", label: "🔒 D: パスコード 2桁目 (OFF)", ratio: 1.0, mode: "contain"},
+      {key: "pass_1_on", label: "🔒 D: パスコード 2桁目 (ON)", ratio: 1.0, mode: "contain"},
+      {key: "pass_2_off", label: "🔒 D: パスコード 3桁目 (OFF)", ratio: 1.0, mode: "contain"},
+      {key: "pass_2_on", label: "🔒 D: パスコード 3桁目 (ON)", ratio: 1.0, mode: "contain"},
+      {key: "pass_3_off", label: "🔒 D: パスコード 4桁目 (OFF)", ratio: 1.0, mode: "contain"},
+      {key: "pass_3_on", label: "🔒 D: パスコード 4桁目 (ON)", ratio: 1.0, mode: "contain"},
+      {key: "main", label: "🖼 A: メイン画像", ratio: 200 / 284, mode: "cover"},
+      {key: "profile_personal", label: "👤 E: プロフィール (個人)", ratio: 1.0, mode: "cover"},
+      {key: "profile_group", label: "👤 E: プロフィール (グループ)", ratio: 1.0, mode: "cover"},
+      {key: "talk_bg", label: "💬 F: トークルーム背景", ratio: 1482 / 1334, mode: "bottom-cover"}
+    ];
+
+    function setupCropperStudio() {
+      const modal = document.getElementById("cropperStudioModal");
+      const openGlobalBtn = document.getElementById("openGlobalStudioBtn");
+      const openMobileBtn = document.getElementById("openMobileStudioBtn");
+      const closeBtn = document.getElementById("closeStudioBtn");
+      const targetSelect = document.getElementById("studioTargetSelect");
+      const fileInput = document.getElementById("studioFileInput");
+      const cropWrapper = document.getElementById("cropCanvasWrapper");
+      const cropBox = document.getElementById("cropBoxOverlay");
+      const sizeRange = document.getElementById("cropBoxSizeRange");
+      const sizeVal = document.getElementById("cropBoxSizeVal");
+      const centerBtn = document.getElementById("centerCropBoxBtn");
+      const applyAndNextBtn = document.getElementById("applyCropAndNextBtn");
+      const applyAndCloseBtn = document.getElementById("applyCropAndCloseBtn");
+
+      targetSelect.innerHTML = ALL_STUDIO_TARGETS.map(t => `<option value="${t.key}">${t.label}</option>`).join("");
+
+      targetSelect.onchange = () => {
+        studioState.targetKey = targetSelect.value;
+        updateStudioTargetRatio();
+        updateCropBoxPosition();
+        renderStudioResultPreview();
+      };
+
+      openGlobalBtn.onclick = () => openCropperStudio(studioState.targetKey);
+      openMobileBtn.onclick = () => openCropperStudio(studioState.targetKey);
+
+      closeBtn.onclick = () => {
+        modal.classList.remove("active");
+        modal.classList.add("pointer-events-none");
+      };
+
+      fileInput.onchange = (e) => {
+        const f = e.target.files[0];
+        if (!f) return;
+        const r = new FileReader();
+        r.onload = (ev) => {
+          const img = new Image();
+          img.onload = () => {
+            studioState.sourceImg = img;
+            initStudioCanvas();
+            triggerAutoSave();
+          };
+          img.src = ev.target.result;
+        };
+        r.readAsDataURL(f);
+      };
+
+      let isDragging = false;
+      let dragStartX = 0, dragStartY = 0;
+      let boxStartLeft = 0, boxStartTop = 0;
+
+      function onPointerDown(e) {
+        isDragging = true;
+        const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+        const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+        dragStartX = clientX;
+        dragStartY = clientY;
+        boxStartLeft = studioState.boxX;
+        boxStartTop = studioState.boxY;
+        e.preventDefault();
+      }
+
+      function onPointerMove(e) {
+        if (!isDragging) return;
+        const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+        const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+        const dx = clientX - dragStartX;
+        const dy = clientY - dragStartY;
+
+        studioState.boxX = boxStartLeft + dx;
+        studioState.boxY = boxStartTop + dy;
+        clampCropBox();
+        applyCropBoxStyles();
+        renderStudioResultPreview();
+      }
+
+      function onPointerUp() {
+        isDragging = false;
+      }
+
+      cropBox.addEventListener("mousedown", onPointerDown);
+      window.addEventListener("mousemove", onPointerMove);
+      window.addEventListener("mouseup", onPointerUp);
+
+      cropBox.addEventListener("touchstart", onPointerDown, {passive: false});
+      window.addEventListener("touchmove", onPointerMove, {passive: false});
+      window.addEventListener("touchend", onPointerUp);
+
+      sizeRange.oninput = (e) => {
+        studioState.boxSizePercent = parseInt(e.target.value);
+        sizeVal.textContent = studioState.boxSizePercent + "%";
+        updateCropBoxPosition();
+        renderStudioResultPreview();
+      };
+
+      centerBtn.onclick = () => {
+        centerCropBox();
+        applyCropBoxStyles();
+        renderStudioResultPreview();
+      };
+
+      applyAndNextBtn.onclick = () => {
+        applyCroppedImageToTarget(studioState.targetKey);
+        const curIdx = ALL_STUDIO_TARGETS.findIndex(t => t.key === studioState.targetKey);
+        if (curIdx !== -1 && curIdx < ALL_STUDIO_TARGETS.length - 1) {
+          targetSelect.value = ALL_STUDIO_TARGETS[curIdx + 1].key;
+          targetSelect.onchange();
+        }
+      };
+
+      applyAndCloseBtn.onclick = () => {
+        applyCroppedImageToTarget(studioState.targetKey);
+        closeBtn.click();
+      };
+    }
+
+    function openCropperStudio(targetKey) {
+      const modal = document.getElementById("cropperStudioModal");
+      modal.classList.add("active");
+      modal.classList.remove("pointer-events-none");
+
+      if (targetKey) {
+        studioState.targetKey = targetKey;
+        document.getElementById("studioTargetSelect").value = targetKey;
+      }
+
+      if (!studioState.sourceImg) {
+        const existing = state.assets[studioState.targetKey];
+        if (existing && existing.rawSourceImg) {
+          studioState.sourceImg = existing.rawSourceImg;
+        } else if (existing && existing.img) {
+          studioState.sourceImg = existing.img;
+        }
+      }
+
+      initStudioCanvas();
+    }
+
+    function updateStudioTargetRatio() {
+      const item = ALL_STUDIO_TARGETS.find(t => t.key === studioState.targetKey);
+      studioState.boxRatio = item ? item.ratio : 1.0;
+      document.getElementById("targetSpecLabel").textContent = item ? `比率 ${item.ratio.toFixed(2)}` : "";
+    }
+
+    function initStudioCanvas() {
+      const wrapper = document.getElementById("cropCanvasWrapper");
+      const canvas = document.getElementById("cropSourceCanvas");
+      const dimEl = document.getElementById("studioImgDimensions");
+
+      if (!studioState.sourceImg) {
+        canvas.width = 400; canvas.height = 300;
+        const ctx = canvas.getContext("2d");
+        ctx.clearRect(0, 0, 400, 300);
+        ctx.fillStyle = "#64748b";
+        ctx.font = "14px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("右上の「📁 別の画像を読み込む」から", 200, 140);
+        ctx.fillText("大画像を読み込んでください", 200, 165);
+        dimEl.textContent = "未読み込み";
+        document.getElementById("cropBoxOverlay").style.display = "none";
+        return;
+      }
+
+      document.getElementById("cropBoxOverlay").style.display = "flex";
+      const img = studioState.sourceImg;
+      dimEl.textContent = `原画: ${img.naturalWidth} × ${img.naturalHeight} px`;
+
+      const maxW = wrapper.clientWidth - 16 || 500;
+      const maxH = Math.min(window.innerHeight * 0.5, 420);
+      const imgAspect = img.naturalWidth / img.naturalHeight;
+
+      let dw = maxW, dh = maxW / imgAspect;
+      if (dh > maxH) {
+        dh = maxH;
+        dw = dh * imgAspect;
+      }
+
+      canvas.width = dw;
+      canvas.height = dh;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, dw, dh);
+
+      studioState.canvasW = dw;
+      studioState.canvasH = dh;
+
+      updateStudioTargetRatio();
+      centerCropBox();
+      applyCropBoxStyles();
+      renderStudioResultPreview();
+    }
+
+    function centerCropBox() {
+      const cw = studioState.canvasW;
+      const ch = studioState.canvasH;
+      const maxDim = Math.min(cw, ch) * (studioState.boxSizePercent / 100);
+
+      let bw = maxDim, bh = maxDim / studioState.boxRatio;
+      if (bh > ch) {
+        bh = ch * 0.9;
+        bw = bh * studioState.boxRatio;
+      }
+
+      studioState.boxW = bw;
+      studioState.boxH = bh;
+      studioState.boxX = (cw - bw) / 2;
+      studioState.boxY = (ch - bh) / 2;
+    }
+
+    function updateCropBoxPosition() {
+      const cw = studioState.canvasW;
+      const ch = studioState.canvasH;
+      const maxDim = Math.min(cw, ch) * (studioState.boxSizePercent / 100);
+
+      let bw = maxDim, bh = maxDim / studioState.boxRatio;
+      if (bh > ch) {
+        bh = ch * 0.9;
+        bw = bh * studioState.boxRatio;
+      }
+
+      const curCenterX = studioState.boxX + (studioState.boxW / 2);
+      const curCenterY = studioState.boxY + (studioState.boxH / 2);
+
+      studioState.boxW = bw;
+      studioState.boxH = bh;
+      studioState.boxX = curCenterX - (bw / 2);
+      studioState.boxY = curCenterY - (bh / 2);
+
+      clampCropBox();
+      applyCropBoxStyles();
+    }
+
+    function clampCropBox() {
+      const cw = studioState.canvasW;
+      const ch = studioState.canvasH;
+      if (studioState.boxX < 0) studioState.boxX = 0;
+      if (studioState.boxY < 0) studioState.boxY = 0;
+      if (studioState.boxX + studioState.boxW > cw) studioState.boxX = cw - studioState.boxW;
+      if (studioState.boxY + studioState.boxH > ch) studioState.boxY = ch - studioState.boxH;
+    }
+
+    function applyCropBoxStyles() {
+      const box = document.getElementById("cropBoxOverlay");
+      const canvas = document.getElementById("cropSourceCanvas");
+      if (!canvas) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const wrapperRect = document.getElementById("cropCanvasWrapper").getBoundingClientRect();
+      const offsetLeft = rect.left - wrapperRect.left;
+      const offsetTop = rect.top - wrapperRect.top;
+
+      box.style.left = (offsetLeft + studioState.boxX) + "px";
+      box.style.top = (offsetTop + studioState.boxY) + "px";
+      box.style.width = studioState.boxW + "px";
+      box.style.height = studioState.boxH + "px";
+    }
+
+    function renderStudioResultPreview() {
+      if (!studioState.sourceImg) return;
+      const pvCanvas = document.getElementById("cropResultPreviewCanvas");
+      const img = studioState.sourceImg;
+
+      const scaleFactor = img.naturalWidth / studioState.canvasW;
+      const srcX = Math.round(studioState.boxX * scaleFactor);
+      const srcY = Math.round(studioState.boxY * scaleFactor);
+      const srcW = Math.round(studioState.boxW * scaleFactor);
+      const srcH = Math.round(studioState.boxH * scaleFactor);
+
+      pvCanvas.width = 160;
+      pvCanvas.height = Math.round(160 / studioState.boxRatio);
+      const ctx = pvCanvas.getContext("2d");
+      ctx.clearRect(0, 0, pvCanvas.width, pvCanvas.height);
+
+      ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, pvCanvas.width, pvCanvas.height);
+
+      const isBDE = studioState.targetKey.startsWith("B_") || studioState.targetKey.startsWith("pass_") || studioState.targetKey.startsWith("profile_");
+      const isTooSmall = isBDE && (srcW < 300 || srcH < 300);
+      const specLabel = document.getElementById("targetSpecLabel");
+      if (specLabel) {
+        specLabel.innerHTML = `比率 ${(studioState.boxRatio).toFixed(2)} | <span class="${isTooSmall ? 'text-red-500 font-bold' : 'text-emerald-700'}">${srcW}×${srcH}px${isTooSmall ? ' ⚠️' : ''}</span>`;
+      }
+    }
+
+    function applyCroppedImageToTarget(targetKey) {
+      if (!studioState.sourceImg) return;
+      const img = studioState.sourceImg;
+      const scaleFactor = img.naturalWidth / studioState.canvasW;
+
+      const srcX = Math.max(0, Math.round(studioState.boxX * scaleFactor));
+      const srcY = Math.max(0, Math.round(studioState.boxY * scaleFactor));
+      const srcW = Math.min(img.naturalWidth - srcX, Math.round(studioState.boxW * scaleFactor));
+      const srcH = Math.min(img.naturalHeight - srcY, Math.round(studioState.boxH * scaleFactor));
+
+      const targetMeta = ALL_STUDIO_TARGETS.find(t => t.key === targetKey);
+      checkBDEImageResolution(targetKey, srcW, srcH, targetMeta ? targetMeta.label : "");
+
+      const offC = document.createElement("canvas");
+      offC.width = srcW;
+      offC.height = srcH;
+      const ctx = offC.getContext("2d");
+      ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
+
+      const croppedDataUrl = offC.toDataURL("image/png");
+      const newImg = new Image();
+      newImg.onload = () => {
+        const itemMode = targetMeta ? targetMeta.mode : "contain";
+        if (!state.assets[targetKey]) {
+          state.assets[targetKey] = {
+            img: null,
+            rawSourceImg: img,
+            cropConfig: {scale: 100, x: 0, y: 0},
+            maskDataUrl: null,
+            mode: itemMode,
+            specsConfig: [{scale: 100, x: 0, y: 0}, {scale: 100, x: 0, y: 0}]
+          };
+        }
+        const asset = state.assets[targetKey];
+        asset.rawSourceImg = img;
+        asset.img = newImg;
+        asset.mode = itemMode;
+        asset.cropConfig = {scale: 100, x: 0, y: 0};
+        asset.maskDataUrl = null;
+        asset.specsConfig = [{scale: 100, x: 0, y: 0}, {scale: 100, x: 0, y: 0}];
+        asset.filename = `cropped_${targetKey}.png`;
+        asset.filesize = `${Math.round(croppedDataUrl.length * 0.75 / 1024)} KB`;
+        if (targetKey.endsWith("_on")) {
+          asset.customUploaded = true;
+        }
+
+        if (targetKey.endsWith("_off")) {
+          const onKey = targetKey.replace("_off", "_on");
+          if (state.assets[onKey]) {
+            const onAsset = state.assets[onKey];
+            onAsset.img = newImg;
+            onAsset.rawSourceImg = img;
+            onAsset.cropConfig = {scale: 100, x: 0, y: 0};
+            onAsset.maskDataUrl = null;
+            onAsset.autoGenFrom = targetKey;
+          }
+        }
+
+        renderSectionContent(state.currentTab);
+        renderPreview();
+        triggerAutoSave();
+      };
+      newImg.src = croppedDataUrl;
+    }
+
+    // =========================================================================
+    // 9. ZIP一括出力 ＆ リセット
+    // =========================================================================
+    document.getElementById("exportZipBtn").onclick = async () => {
+      const zip = new JSZip();
+      let fileCount = 0;
+
+      // A: メイン画像
+      const a = state.assets["main"];
+      if (a && a.img) {
+        const s = SECTIONS.A.items[0].specs;
+        zip.file("ios_thumbnail.png", await createCroppedBlob(a, a.specsConfig[0] || {scale: 100, x: 0, y: 0}, s[0].w, s[0].h, "cover", true));
+        zip.file("android_thumbnail.png", await createCroppedBlob(a, a.specsConfig[1] || {scale: 100, x: 0, y: 0}, s[1].w, s[1].h, "cover", true));
+        zip.file("store_thumbnail.png", await createCroppedBlob(a, a.specsConfig[2] || {scale: 100, x: 0, y: 0}, s[2].w, s[2].h, "cover", true));
+        fileCount += 3;
+      }
+
+      // B: メニューボタン (bottom-contain で出力)
+      for (const item of SECTIONS.B.items) {
+        const off = state.assets[`${item.id}_off`];
+        const on = state.assets[`${item.id}_on`];
+
+        if (off && (off.img || off.rawSourceImg)) {
+          const pairedGen = on?.autoGen;
+          zip.file(`${item.offKey}_g.png`, await createCroppedBlob(off, off.specsConfig[0] || {scale: 100, x: 0, y: 0}, 80, 56, "bottom-contain", false, true, pairedGen));
+          zip.file(`${item.offKey}.png`, await createCroppedBlob(off, off.specsConfig[1] || {scale: 100, x: 0, y: 0}, 128, 150, "bottom-contain", false, true, pairedGen));
+          fileCount += 2;
+        }
+        if (on && (on.img || (on.autoGen?.enabled && (off?.img || off?.rawSourceImg)))) {
+          zip.file(`${item.onKey}_g.png`, await createCroppedBlob(on, on.specsConfig[0] || {scale: 100, x: 0, y: 0}, 80, 56, "bottom-contain", false));
+          zip.file(`${item.onKey}.png`, await createCroppedBlob(on, on.specsConfig[1] || {scale: 100, x: 0, y: 0}, 128, 150, "bottom-contain", false));
+          fileCount += 2;
+        }
+      }
+
+      // C: メニュー背景
+      const c = state.assets["menu_bg"];
+      if (c && c.img) {
+        zip.file("i_11.png", await createCroppedBlob(c, c.specsConfig[0] || {scale: 100, x: 0, y: 0}, 1472, 150, "cover", false));
+        fileCount += 1;
+      }
+
+      // D: パスコード
+      for (const item of SECTIONS.D.items) {
+        const off = state.assets[`${item.id}_off`];
+        if (off && (off.img || off.rawSourceImg)) {
+          zip.file(item.offIos, await createCroppedBlob(off, off.specsConfig[0] || {scale: 100, x: 0, y: 0}, 120, 120, "contain", false));
+          zip.file(item.offAnd, await createCroppedBlob(off, off.specsConfig[1] || {scale: 100, x: 0, y: 0}, 116, 116, "contain", false));
+          fileCount += 2;
+        }
+        const on = state.assets[`${item.id}_on`];
+        if (on && (on.img || on.rawSourceImg)) {
+          zip.file(item.onIos, await createCroppedBlob(on, on.specsConfig[0] || {scale: 100, x: 0, y: 0}, 120, 120, "contain", false));
+          zip.file(item.onAnd, await createCroppedBlob(on, on.specsConfig[1] || {scale: 100, x: 0, y: 0}, 116, 116, "contain", false));
+          fileCount += 2;
+        }
+      }
+
+      // E: プロフィール
+      const ep = state.assets["profile_personal"];
+      if (ep && ep.img) {
+        zip.file("i_20.png", await createCroppedBlob(ep, ep.specsConfig[0] || {scale: 100, x: 0, y: 0}, 240, 240, "cover", false));
+        zip.file("a_20.png", await createCroppedBlob(ep, ep.specsConfig[1] || {scale: 100, x: 0, y: 0}, 247, 247, "cover", false));
+        fileCount += 2;
+      }
+      const eg = state.assets["profile_group"];
+      if (eg && eg.img) {
+        zip.file("i_21.png", await createCroppedBlob(eg, ep.specsConfig[0] || {scale: 100, x: 0, y: 0}, 240, 240, "cover", false));
+        zip.file("a_21.png", await createCroppedBlob(eg, ep.specsConfig[1] || {scale: 100, x: 0, y: 0}, 247, 247, "cover", false));
+        fileCount += 2;
+      }
+
+      // F: トーク背景
+      const f = state.assets["talk_bg"];
+      if (f && f.img) {
+        zip.file("i_22.png", await createCroppedBlob(f, f.specsConfig[0] || {scale: 100, x: 0, y: 0}, 1482, 1334, "bottom-cover", false));
+        zip.file("a_22.png", await createCroppedBlob(f, f.specsConfig[1] || {scale: 100, x: 0, y: 0}, 1300, 1300, "bottom-cover", false));
+        fileCount += 2;
+      }
+
+      if (fileCount === 0) {
+        alert("素材が登録されていません。画像を1枚以上アップロードしてください。");
+        return;
+      }
+
+      const content = await zip.generateAsync({type: "blob"});
+      saveAs(content, "line_theme_assets.zip");
+    };
+
+    // リセット処理
+    document.getElementById("resetAllBtn").onclick = async () => {
+      if (confirm("作業中のすべての画像・調整内容をリセットしますか？\n（ブラウザ内の保存データも消去されます）")) {
+        await clearDB();
+        state.assets = {};
+        studioState.sourceImg = null;
+        state.talkBgColor = "#edf8fb";
+        renderSectionContent(state.currentTab);
+        renderPreview();
+        document.getElementById("saveStatus").textContent = "☁️ リセット完了";
+      }
+    };
+
+    window.onload = init;
+  </script>
+</body>
+
+</html>
