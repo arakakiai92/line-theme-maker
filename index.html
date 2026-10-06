@@ -203,7 +203,11 @@
             </button>
             <button id="copyHomeOnToAllBtn"
               class="bg-slate-800 hover:bg-black text-white font-bold px-2 py-1 rounded shadow-xs whitespace-nowrap transition flex items-center gap-1">
-              <span>⚡ 1番を全ボタンへ反映</span>
+              <span>⚡ 1番の設定を全ON/OFFへコピー</span>
+            </button>
+            <button id="copyBaseToSelectedBtn" type="button"
+              class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-2 py-1 rounded shadow-xs whitespace-nowrap transition flex items-center gap-1">
+              <span>📋 1番をベースにコピー</span>
             </button>
           </div>
         </div>
@@ -383,7 +387,7 @@
             <div id="adjSpecTabs" class="flex gap-1"></div>
             <label id="adjLinkRow" class="mt-1.5 flex items-center gap-1.5 text-[10px] text-slate-600 cursor-pointer select-none">
               <input type="checkbox" id="adjLinkChk" class="rounded text-emerald-600">
-              <span>iPhone / Android に同じ調整を反映（連動）</span>
+              <span>複数の出力に同じ調整を反映（連動）</span>
             </label>
           </div>
 
@@ -409,23 +413,6 @@
             <input type="range" id="adjYRange" min="-100" max="100" step="0.5" value="0" class="w-full">
           </div>
           <p id="adjHint" class="text-[10px] text-slate-500 bg-slate-50 border rounded p-2 leading-snug"></p>
-
-          <div id="adjPassOnEffects" class="hidden bg-indigo-50 border border-indigo-200 rounded-lg p-2 space-y-2">
-            <div class="text-[10px] font-bold text-indigo-800">✨ ON加工・効果（メニューONと同じ）</div>
-            <div class="grid grid-cols-2 gap-1.5">
-              <label class="text-[9px]">縮小: <b id="adjPassScaleVal">90%</b><input id="adjPassScale" type="range" min="70" max="115" value="90" class="w-full"></label>
-              <label class="text-[9px]">上下(Y): <b id="adjPassYVal">0px</b><input id="adjPassY" type="range" min="-12" max="12" value="0" class="w-full"></label>
-            </div>
-            <div class="grid grid-cols-2 gap-1.5 text-[9px]">
-              <label class="flex items-center gap-1"><input id="adjPassNeon" type="checkbox">背景ネオン <input id="adjPassNeonColor" type="color" value="#00ffcc" class="w-4 h-4"></label>
-              <label class="flex items-center gap-1"><input id="adjPassOutline" type="checkbox">白フチ <input id="adjPassOutlineColor" type="color" value="#ffffff" class="w-4 h-4"></label>
-            </div>
-            <label class="block text-[9px]">ネオン範囲: <b id="adjPassBlurVal">標準 (14)</b><input id="adjPassBlur" type="range" min="2" max="30" value="14" class="w-full"></label>
-            <div class="grid grid-cols-2 gap-1.5 text-[9px]">
-              <label class="flex items-center gap-1"><input id="adjPassPill" type="checkbox">円形座布団 <input id="adjPassPillColor" type="color" value="#d1fae5" class="w-4 h-4"></label>
-              <label class="flex items-center gap-1"><input id="adjPassShadow" type="checkbox">落ち影</label>
-            </div>
-          </div>
 
           <div class="grid grid-cols-2 gap-2">
             <button id="adjCenterBtn" type="button" class="bg-white hover:bg-slate-100 text-slate-700 font-bold py-1.5 rounded border transition">🎯 中央</button>
@@ -804,7 +791,6 @@
         menuInheritOwn: state.menuOwn,
         studioSourceDataUrl: studioState.sourceImg ? studioState.sourceImg.src : null,
         menuInheritCustom: state.menuCustom,
-        menuMasterCustom: state.menuMasterCustom,
         assets: cleanAssets
       });
 
@@ -878,11 +864,6 @@
           });
 
           // 子ボタンの「個別編集済み」状態を復元。旧データ(項目なし)は既存の中身を守るため個別編集済み扱いにする
-          if (data.menuMasterCustom && typeof data.menuMasterCustom === "object") {
-            state.menuMasterCustom = {...data.menuMasterCustom};
-          } else {
-            state.menuMasterCustom = {};
-          }
           if (data.menuInheritCustom && typeof data.menuInheritCustom === "object") {
             state.menuCustom = {...data.menuInheritCustom};
           } else {
@@ -1026,9 +1007,8 @@
       assets: {},
       talkBgNone: false, // F: 背景なし（透過）を選択中か（画像・調整値は保持したまま切り替え）
       menuOwn: {},      // 子ボタンIDごとの「自分の素材(アップロード/コピー)を持つ」フラグ（保存対象）
-      menuCustom: {},   // 既存の3→4 / 6→5・7 / 8→9 の個別編集済みフラグ
-      menuSynced: {},
-      menuMasterCustom: {} // 1番マスターに対する個別編集フラグ（position / ios26 / effects）
+      menuCustom: {},   // 子ボタンIDごとの「個別編集済み」フラグ（保存対象）
+      menuSynced: {}    // 子ボタンIDごとの「最後に継承した親の状態シグネチャ」（メモリのみ）
     };
     let appUiReady = false;
 
@@ -1110,12 +1090,65 @@
           openMenuButtonStudio(state.activeButtonKey || "B_home");
         };
 
+        document.getElementById("copyBaseToSelectedBtn").onclick = openCopyBaseDialog;
+
         document.getElementById("copyHomeOnToAllBtn").onclick = () => {
-          const count = applyMenuMasterNow(true);
+          const homeOff = state.assets["B_home_off"];
+          if (!homeOff || (!homeOff.img && !homeOff.rawSourceImg)) {
+            alert("まずは1. ホームのOFF側をアップロードして調整してください。");
+            return;
+          }
+
+          // ★ この一括コピーの基準は「1番のOFF側」。
+          // 1番で最初に調整した大きさ・X・Yを、そのまま2〜9番の
+          // OFF/ON両方の基本配置へコピーする。
+          // ON側のエフェクト設定（ネオン・フチ等）は各ボタンのものを維持する。
+          // ただしON側の autoGen による縮小・Yずれは、OFFと同じ見た目の
+          // 大きさ/位置にするため無効化する（scaleRatio=100 / yShift=0）。
+          const baseConfig = JSON.parse(JSON.stringify(
+            homeOff.cropConfig || {scale: 100, x: 0, y: 0}
+          ));
+          let count = 0;
+
+          SECTIONS.B.items.forEach(item => {
+            if (item.id === "B_home") return;
+
+            const off = state.assets[`${item.id}_off`];
+            if (!off || (!off.img && !off.rawSourceImg)) return;
+
+            // OFF：1番OFFの大きさ・位置をそのままコピー。
+            off.cropConfig = {...baseConfig};
+
+            // ON：存在しなければ既存の自動生成経路で用意する。
+            let on = state.assets[`${item.id}_on`];
+            if (!on) {
+              applyAutoGenToItem(item.id, {
+                enabled: true, scaleRatio: 100, yShift: 0,
+                brightness: 100, saturate: 100,
+                neonEnabled: false, outlineEnabled: false,
+                pillEnabled: false, shadowEnabled: false
+              });
+              on = state.assets[`${item.id}_on`];
+            }
+
+            if (on) {
+              // ONも同じ元画像配置を使用。ON固有のエフェクトは保持する。
+              on.cropConfig = {...baseConfig};
+              on.autoGenFrom = `${item.id}_off`;
+              if (!on.autoGen) on.autoGen = {enabled: true};
+              on.autoGen.enabled = true;
+              on.autoGen.scaleRatio = 100;
+              on.autoGen.yShift = 0;
+            }
+
+            markMenuCustom(item.id);
+            count++;
+          });
+
           renderSectionContent("B");
           renderPreview();
           triggerAutoSave();
-          alert(`1番の通常/Android・iOS 26・ON加工設定を ${count} 個のボタンへ反映しました。`);
+          alert(`1番OFFの大きさ・位置を、他の ${count} 個のボタンのOFF/ONへコピーしました！`);
         };
       } else {
         quickBar.classList.add("hidden");
@@ -1215,10 +1248,7 @@
           row.innerHTML = `
         <div class="flex items-center justify-between mb-1.5 pb-1 border-b border-slate-100">
           <h3 class="font-bold text-xs text-slate-800">${item.label}</h3>
-          <div class="flex items-center gap-1">
-            <button type="button" class="pass-swap-btn text-[8px] bg-white hover:bg-indigo-50 text-indigo-700 border border-indigo-200 rounded px-1.5 py-0.5 font-bold" data-id="${item.id}">↔ OFF/ON入れ替え</button>
-            <span class="text-[8px] text-slate-400 font-mono">OFF / ON 横並び</span>
-          </div>
+          <span class="text-[8px] text-slate-400 font-mono">OFF / ON 横並び</span>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
           <div id="box_${item.id}_off"></div>
@@ -1226,7 +1256,6 @@
         </div>
       `;
           container.appendChild(row);
-          row.querySelector('.pass-swap-btn').onclick = () => swapPasscodeStates(item.id);
 
           createCompactUploader(row.querySelector(`#box_${item.id}_off`), {
             key: `${item.id}_off`,
@@ -1244,7 +1273,6 @@
             badgeText: "ON (入力済)",
             badgeColor: "bg-indigo-100 text-indigo-800 font-bold",
             mode: "contain",
-            isPasscodeOn: true,
             specs: [
               {targetKey: "ios", os: "iPhone (iOS)", file: item.onIos, w: 120, h: 120},
               {targetKey: "android", os: "Android", file: item.onAnd, w: 116, h: 116}
@@ -1509,7 +1537,7 @@
     }
 
     function createCompactUploader(parent, opt) {
-      assetOptRegistry[opt.key] = opt;   // D/E/F 調整モーダルが出力サイズ・モードを参照するための登録
+      assetOptRegistry[opt.key] = opt;   // A/C/D/E/F 調整モーダルが出力サイズ・モードを参照するための登録
       if (!state.assets[opt.key]) {
         state.assets[opt.key] = {
           img: null,
@@ -1630,9 +1658,7 @@
           e.stopPropagation();
           if (opt.key.startsWith("B_")) {
             const itemId = opt.parentItemKey || opt.key.split('_').slice(0, 2).join('_');
-            // 出力ごとの調整ボタンは iOS26 / 従来Android の specsConfig を直接編集。
-            // OFF/ONの総合スタジオはカード上部の「専用スタジオ」で開く。
-            openAssetAdjuster(opt.key, parseInt(btn.dataset.idx) || 0);
+            openMenuButtonStudio(itemId);
           } else if (adjGroupOf(opt.key)) {
             openAssetAdjuster(opt.key, parseInt(btn.dataset.idx) || 0);
           }
@@ -2254,7 +2280,6 @@
         stopTapSimulation();
         ensureAgEnabled(onAsset);
         callback(onAsset.autoGen);
-        if (menuStudioState.currentItemId !== "B_home") markMenuMasterCustom(menuStudioState.currentItemId, "effects");
         setStudioTab("on");
       }
 
@@ -2411,12 +2436,6 @@
       triggerAutoSave();
     }
 
-    function markMenuMasterCustom(itemId, type) {
-      if (itemId === "B_home") return;
-      state.menuMasterCustom[itemId] = {...(state.menuMasterCustom[itemId] || {}), [type]: true};
-      triggerAutoSave();
-    }
-
     function markMenuCustom(itemId) {
       const meta = SECTIONS.B.items.find(it => it.id === itemId);
       if (!meta || !meta.inheritFrom) return;   // 親を持たないボタン(1,2,3,6,8)は対象外
@@ -2449,63 +2468,10 @@
       return !!(o && (o.img || o.rawSourceImg));
     }
 
-    function menuMasterSig() {
-      const off = state.assets["B_home_off"], on = state.assets["B_home_on"];
-      if (!off) return "";
-      return JSON.stringify([off.cropConfig, off.specsConfig?.[0], off.specsConfig?.[1], on?.autoGen]);
-    }
-
-    function copyMenuMasterToItem(tid) {
-      const srcOff = state.assets["B_home_off"], srcOn = state.assets["B_home_on"];
-      const off = state.assets[`${tid}_off`], on = state.assets[`${tid}_on`];
-      if (!srcOff || !off) return false;
-      if (!state.menuMasterCustom[tid]?.position) off.cropConfig = srcOff.cropConfig ? {...srcOff.cropConfig} : {scale:100,x:0,y:0};
-      if (!state.menuMasterCustom[tid]?.ios26) {
-        const c = srcOff.specsConfig?.[0] || {scale:100,x:0,y:0};
-        off.specsConfig[0] = {...c};
-        if (on) on.specsConfig[0] = {...c};
-      }
-      if (!state.menuMasterCustom[tid]?.position) {
-        const c = srcOff.specsConfig?.[1] || {scale:100,x:0,y:0};
-        off.specsConfig[1] = {...c};
-        if (on) on.specsConfig[1] = {...c};
-      }
-      if (!state.menuMasterCustom[tid]?.effects && srcOn) {
-        ensureAgEnabled(srcOn);
-        if (on) on.autoGen = JSON.parse(JSON.stringify(srcOn.autoGen));
-      }
-      return true;
-    }
-
-    function applyMenuMasterNow(includeAll=true) {
-      let count = 0;
-      for (const it of SECTIONS.B.items) {
-        if (it.id === "B_home") continue;
-        ensureMenuButtonAssets(it.id);
-        if (copyMenuMasterToItem(it.id)) { count++; }
-      }
-      return count;
-    }
-
-    function syncMenuMasterInheritance() {
-      const srcOff = state.assets["B_home_off"];
-      if (!srcOff || !(srcOff.img || srcOff.rawSourceImg)) return false;
-      let changed = false;
-      for (const it of SECTIONS.B.items) {
-        if (it.id === "B_home") continue;
-        const before = JSON.stringify([state.assets[`${it.id}_off`]?.cropConfig, state.assets[`${it.id}_off`]?.specsConfig, state.assets[`${it.id}_on`]?.specsConfig, state.assets[`${it.id}_on`]?.autoGen]);
-        copyMenuMasterToItem(it.id);
-        const after = JSON.stringify([state.assets[`${it.id}_off`]?.cropConfig, state.assets[`${it.id}_off`]?.specsConfig, state.assets[`${it.id}_on`]?.specsConfig, state.assets[`${it.id}_on`]?.autoGen]);
-        changed ||= before !== after;
-      }
-      return changed;
-    }
-
     let menuInheritRunning = false;
     let menuInheritPending = false;
 
     async function syncMenuInheritance() {
-      syncMenuMasterInheritance();
       if (menuInheritRunning) {menuInheritPending = true; return [];}
       menuInheritRunning = true;
       const changed = new Set();
@@ -2544,6 +2510,73 @@
         triggerAutoSave();
       }
       return [...changed];
+    }
+
+    function openCopyBaseDialog() {
+      const srcOff = state.assets[`${BASE_MENU_ID}_off`];
+      if (!srcOff || (!srcOff.img && !srcOff.rawSourceImg)) {
+        alert("まずは1番(ホーム)のOFF画像を登録・調整してください。");
+        return;
+      }
+      document.getElementById("copyBaseDialog")?.remove();
+
+      const baseLabel = SECTIONS.B.items[0].label;
+      const targets = SECTIONS.B.items.filter(it => it.id !== BASE_MENU_ID);
+      const overlay = document.createElement("div");
+      overlay.id = "copyBaseDialog";
+      overlay.className = "fixed inset-0 z-[60] bg-black/70 flex items-center justify-center p-3";
+      overlay.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+          <div class="bg-indigo-600 text-white px-4 py-3">
+            <h3 class="font-bold text-sm">📋 1番をベースにコピー</h3>
+            <p class="text-[10px] text-indigo-100 mt-0.5">コピー元: ${baseLabel}（複製後はコピー先が完全に独立します）</p>
+          </div>
+          <div class="p-3 text-xs">
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="font-bold text-slate-700">コピー先を選択</span>
+              <span class="flex gap-1">
+                <button type="button" id="copyBaseSelAll" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 font-semibold">全て選択</button>
+                <button type="button" id="copyBaseSelNone" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 font-semibold">全解除</button>
+              </span>
+            </div>
+            <div class="max-h-[50vh] overflow-y-auto space-y-1">
+              ${targets.map(it => `
+                <label class="flex items-center gap-2 px-2 py-1.5 rounded border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                  <input type="checkbox" class="copy-base-chk rounded" value="${it.id}">
+                  <span class="font-semibold text-slate-800">${it.label}</span>
+                  ${menuButtonHasContent(it.id) ? '<span class="ml-auto text-[9px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1">設定済み（上書き）</span>' : ''}
+                </label>`).join("")}
+            </div>
+          </div>
+          <div class="px-3 pb-3 flex justify-end gap-2 text-xs">
+            <button type="button" id="copyBaseCancel" class="px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200 font-bold">キャンセル</button>
+            <button type="button" id="copyBaseRun" class="px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white font-bold disabled:opacity-40" disabled>選択した項目にコピー</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+
+      const chks = () => [...overlay.querySelectorAll(".copy-base-chk")];
+      const runBtn = overlay.querySelector("#copyBaseRun");
+      const refresh = () => {runBtn.disabled = !chks().some(c => c.checked);};
+      chks().forEach(c => c.onchange = refresh);
+      overlay.querySelector("#copyBaseSelAll").onclick = () => {chks().forEach(c => c.checked = true); refresh();};
+      overlay.querySelector("#copyBaseSelNone").onclick = () => {chks().forEach(c => c.checked = false); refresh();};
+      overlay.querySelector("#copyBaseCancel").onclick = () => overlay.remove();
+      overlay.addEventListener("mousedown", (e) => {if (e.target === overlay) overlay.remove();});
+
+      runBtn.onclick = async () => {
+        const ids = chks().filter(c => c.checked).map(c => c.value);
+        if (!ids.length) return;
+        const overwrite = ids.filter(menuButtonHasContent);
+        if (overwrite.length && !confirm(`設定済みのボタン ${overwrite.length} 個を上書きします。よろしいですか？`)) return;
+        runBtn.disabled = true;
+        const n = await copyBaseMenuButtonTo(ids);
+        overlay.remove();
+        renderSectionContent("B");
+        renderPreview();
+        triggerAutoSave();
+        alert(`1番をベースに ${n} 個のボタンへ複製しました。以降は各ボタンを独立して編集できます。`);
+      };
     }
 
     // =========================================================================
@@ -2627,22 +2660,27 @@
     }
 
     // =========================================================================
-    // ★ D / E / F: 画像調整モーダル（出力ごとの specsConfig を直接編集）
+    // ★ A / C / D / E / F: 画像調整モーダル（出力ごとの specsConfig を直接編集）
     //   B専用のIDやspecsConfigは使わず、各アップローダーが持つ spec（出力サイズ）と mode をそのまま使う。
     // =========================================================================
     const assetOptRegistry = {};
     const adjState = {key: null, idx: 0, linked: false, snapshot: null, drag: null, raf: 0, observer: null, statusTimer: null};
 
     function adjGroupOf(key) {
+      // A〜Fのうち、共通の画像調整モーダルで扱えるグループを返す。
+      // Bは専用スタジオ、A/C/D/E/Fはこのモーダルを使用する。
+      if (key === "main") return "A";
       if (key.startsWith("pass_")) return "D";
       if (key.startsWith("profile_")) return "E";
       if (key === "talk_bg") return "F";
+      if (key === "menu_bg") return "C";
       return null;
     }
 
     function adjTargetKeys(group) {
       if (group === "D") return SECTIONS.D.items.flatMap(it => [`${it.id}_off`, `${it.id}_on`]);
-      return SECTIONS[group].items.map(it => it.id);
+      if (group === "A" || group === "C" || group === "E" || group === "F") return SECTIONS[group].items.map(it => it.id);
+      return [];
     }
 
     function adjTargetLabel(key) {
@@ -2715,9 +2753,6 @@
       if (!cur) return;
       const {opt, a} = cur;
       a.specsConfig[adjState.idx] = adjClampConf(opt, cur.spec, a.img, {...a.specsConfig[adjState.idx], ...patch});
-      if (adjState.key.startsWith("B_") && adjState.key !== "B_home_off" && adjState.key !== "B_home_on") {
-        markMenuMasterCustom(adjState.key.replace(/_(off|on)$/, ""), adjState.idx === 0 ? "ios26" : "position");
-      }
       if (adjState.linked) {
         const src = a.specsConfig[adjState.idx];
         opt.specs.forEach((sp, j) => {
@@ -2783,8 +2818,7 @@
       const cv = document.getElementById("adjMainCanvas");
       const k = Math.min(1, 360 / Math.max(spec.w, spec.h));
       const W = Math.max(1, Math.round(spec.w * k)), H = Math.max(1, Math.round(spec.h * k));
-      const passGen = (adjState.key.startsWith("pass_") && adjState.key.endsWith("_on")) ? a.autoGen : null;
-      drawCropToCanvas(cv, a.img, W, H, conf.scale, conf.x, conf.y, opt.mode, opt.forceOpaque, passGen);
+      drawCropToCanvas(cv, a.img, W, H, conf.scale, conf.x, conf.y, opt.mode, opt.forceOpaque);
       cv.style.width = W + "px";
       cv.style.height = H + "px";
       document.getElementById("adjOutInfo").textContent = `${spec.os} ${spec.w}×${spec.h}px ／ 元画像 ${a.img.naturalWidth}×${a.img.naturalHeight}px`;
@@ -2859,11 +2893,12 @@
       document.getElementById("adjTargetBadge").textContent = adjTargetLabel(key);
       document.getElementById("adjSubLabel").textContent = (key === "talk_bg" && state.talkBgNone)
         ? "※ 現在「背景なし（透過）」が選択中のため、出力・プレビューには使われません（調整値は保持されます）"
-        : "出力サイズどおりの見え方で調整できます";
+        : (key === "main"
+          ? "出力サイズごとに、拡大縮小・位置を調整してトリミング範囲を選べます"
+          : "出力サイズどおりの見え方で調整できます");
       document.getElementById("adjTargetSelect").value = key;
       adjBuildTabs();
       adjSyncControls();
-      syncPassEffectsPanel();
       adjDraw();
     }
 
@@ -2911,36 +2946,26 @@
     function adjStep(dir) {
       const group = adjGroupOf(adjState.key);
       const keys = adjTargetKeys(group).filter(k => adjHasImage(k) && assetOptRegistry[k]);
-      if (keys.length < 2) return;
-      const i = keys.indexOf(adjState.key);
-      const next = keys[(i + dir + keys.length) % keys.length];
-      adjLoadTarget(next, adjState.idx);
-      adjSetStatus("調整は自動で保存されます", false);
-    }
 
-    function syncPassEffectsPanel() {
-      const box = document.getElementById("adjPassOnEffects");
-      if (!box) return;
-      const isPassOn = !!(adjState.key && adjState.key.startsWith("pass_") && adjState.key.endsWith("_on"));
-      box.classList.toggle("hidden", !isPassOn);
-      if (!isPassOn) return;
-      const a = state.assets[adjState.key];
-      if (!a) return;
-      ensureAgEnabled(a);
-      const ag = a.autoGen;
-      document.getElementById("adjPassScale").value = ag.scaleRatio || 90;
-      document.getElementById("adjPassScaleVal").textContent = (ag.scaleRatio || 90) + "%";
-      document.getElementById("adjPassY").value = ag.yShift || 0;
-      document.getElementById("adjPassYVal").textContent = (ag.yShift || 0) + "px";
-      document.getElementById("adjPassNeon").checked = !!ag.neonEnabled;
-      document.getElementById("adjPassNeonColor").value = ag.neonColor || "#00ffcc";
-      document.getElementById("adjPassBlur").value = getNeonBlur(ag);
-      document.getElementById("adjPassBlurVal").textContent = neonBlurLabel(getNeonBlur(ag));
-      document.getElementById("adjPassOutline").checked = !!ag.outlineEnabled;
-      document.getElementById("adjPassOutlineColor").value = ag.outlineColor || "#ffffff";
-      document.getElementById("adjPassPill").checked = !!ag.pillEnabled;
-      document.getElementById("adjPassPillColor").value = /^#[0-9a-fA-F]{6}$/.test(ag.pillColor || "") ? ag.pillColor : "#d1fae5";
-      document.getElementById("adjPassShadow").checked = !!ag.shadowEnabled;
+      // 複数の画像があるグループは「画像」単位で移動。
+      if (keys.length >= 2) {
+        const i = keys.indexOf(adjState.key);
+        const next = keys[(i + dir + keys.length) % keys.length];
+        adjLoadTarget(next, adjState.idx);
+        adjSetStatus("調整は自動で保存されます", false);
+        return;
+      }
+
+      // A/C/Fなど、元画像が1枚で出力先が複数ある場合は、
+      // 「前の画像 / 次の画像」を出力先（iOS / Android / STORE等）の切替として機能させる。
+      const curOpt = assetOptRegistry[adjState.key];
+      if (!curOpt || !curOpt.specs || curOpt.specs.length < 2) return;
+      const nextIdx = (adjState.idx + dir + curOpt.specs.length) % curOpt.specs.length;
+      adjState.idx = nextIdx;
+      adjBuildTabs();
+      adjSyncControls();
+      adjDraw();
+      adjSetStatus("調整は自動で保存されます", false);
     }
 
     function setupAssetAdjuster() {
@@ -2976,32 +3001,6 @@
       };
       $("adjPrevBtn").onclick = () => adjStep(-1);
       $("adjNextBtn").onclick = () => adjStep(1);
-
-      const passEffectIds = ["adjPassScale","adjPassY","adjPassNeon","adjPassNeonColor","adjPassBlur","adjPassOutline","adjPassOutlineColor","adjPassPill","adjPassPillColor","adjPassShadow"];
-      passEffectIds.forEach(id => {
-        const el = $(id);
-        if (el) el.addEventListener(el.type === "checkbox" ? "change" : "input", () => {
-          const cur = adjCurrent();
-          if (!cur || !(adjState.key.startsWith("pass_") && adjState.key.endsWith("_on"))) return;
-          ensureAgEnabled(cur.a);
-          const ag = cur.a.autoGen;
-          ag.scaleRatio = parseInt($("adjPassScale").value);
-          ag.yShift = parseInt($("adjPassY").value);
-          ag.neonEnabled = $("adjPassNeon").checked;
-          ag.neonColor = $("adjPassNeonColor").value;
-          ag.neonBlur = parseInt($("adjPassBlur").value);
-          ag.outlineEnabled = $("adjPassOutline").checked;
-          ag.outlineColor = $("adjPassOutlineColor").value;
-          ag.pillEnabled = $("adjPassPill").checked;
-          ag.pillColor = $("adjPassPillColor").value;
-          ag.shadowEnabled = $("adjPassShadow").checked;
-          ag.enabled = true;
-          document.getElementById("adjPassScaleVal").textContent = ag.scaleRatio + "%";
-          document.getElementById("adjPassYVal").textContent = ag.yShift + "px";
-          document.getElementById("adjPassBlurVal").textContent = neonBlurLabel(ag.neonBlur);
-          adjAfterChange();
-        });
-      });
       $("adjTargetSelect").onchange = (e) => {
         const k = e.target.value;
         if (!adjHasImage(k)) {
@@ -3265,7 +3264,6 @@
       // 子ボタンをスタジオで実際に編集していたら「個別編集済み」にする（開いて移動しただけでは変えない）
       if (menuStudioState.baseSig != null &&
           (studioEditSig() !== menuStudioState.baseSig || menuStudioState.maskTouched)) {
-        if (menuStudioState.currentItemId !== "B_home") markMenuMasterCustom(menuStudioState.currentItemId, "position");
         markMenuCustom(menuStudioState.currentItemId);
         menuStudioState.baseSig = studioEditSig();
         menuStudioState.maskTouched = false;
@@ -3498,17 +3496,6 @@
       createCroppedBlob(assetData, conf, targetW, targetH, mode, forceOpaque).then(blob => {
         if (blob) saveAs(blob, filename);
       });
-    }
-
-    function swapPasscodeStates(itemId) {
-      const offKey = `${itemId}_off`, onKey = `${itemId}_on`;
-      const off = state.assets[offKey], on = state.assets[onKey];
-      if (!off || !on) { alert("OFF/ONのデータがまだ揃っていません。"); return; }
-      state.assets[offKey] = on;
-      state.assets[onKey] = off;
-      renderSectionContent("D");
-      renderPreview();
-      triggerAutoSave();
     }
 
     function copyPasscode1toAll() {
