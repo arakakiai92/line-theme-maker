@@ -410,6 +410,28 @@
           </div>
           <p id="adjHint" class="text-[10px] text-slate-500 bg-slate-50 border rounded p-2 leading-snug"></p>
 
+          <div id="adjDOnEffects" class="hidden bg-indigo-50 border border-indigo-200 rounded-lg p-2.5 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-indigo-900">✨ ON加工・効果</span>
+              <span class="text-[8px] text-indigo-600 font-bold">メニューONと同じ加工</span>
+            </div>
+            <div class="grid grid-cols-2 gap-1.5 bg-white p-1.5 rounded border border-indigo-100 text-[10px]">
+              <label class="block">縮小: <b id="adjDAgScaleVal" class="font-mono text-emerald-700">90%</b><input type="range" id="adjDAgScaleRange" min="70" max="115" value="90" class="w-full mt-1"></label>
+              <label class="block">上下 (Y): <b id="adjDAgYVal" class="font-mono text-emerald-700">0px</b><input type="range" id="adjDAgYRange" min="-12" max="12" value="0" class="w-full mt-1"></label>
+            </div>
+            <div class="grid grid-cols-2 gap-1.5 bg-white p-1.5 rounded border border-indigo-100 text-[10px]">
+              <label class="flex items-center justify-between gap-1 font-semibold"><span><input type="checkbox" id="adjDAgNeonToggle" class="rounded"> 背景ネオン</span><input type="color" id="adjDAgNeonPicker" value="#00ffcc" class="w-4 h-4 rounded cursor-pointer p-0 bg-transparent"></label>
+              <label class="flex items-center justify-between gap-1 font-semibold"><span><input type="checkbox" id="adjDAgOutlineToggle" class="rounded"> 白フチ取り</span><input type="color" id="adjDAgOutlinePicker" value="#ffffff" class="w-4 h-4 rounded cursor-pointer p-0 bg-transparent"></label>
+            </div>
+            <div class="bg-white p-1.5 rounded border border-indigo-100 text-[10px]">
+              <label class="block">ネオン範囲（広がり）: <b id="adjDAgNeonBlurVal" class="font-mono text-cyan-700">標準 (14)</b><input type="range" id="adjDAgNeonBlurRange" min="2" max="30" step="1" value="14" class="w-full mt-1"></label>
+            </div>
+            <div class="grid grid-cols-2 gap-1.5 bg-white p-1.5 rounded border border-indigo-100 text-[10px]">
+              <label class="flex items-center justify-between gap-1 font-semibold"><span><input type="checkbox" id="adjDAgPillToggle" class="rounded"> 円形座布団</span><input type="color" id="adjDAgPillPicker" value="#d1fae5" class="w-4 h-4 rounded cursor-pointer p-0 bg-transparent"></label>
+              <label class="flex items-center gap-1 font-semibold"><input type="checkbox" id="adjDAgShadowToggle" class="rounded"> 落ち影</label>
+            </div>
+          </div>
+
           <div class="grid grid-cols-2 gap-2">
             <button id="adjCenterBtn" type="button" class="bg-white hover:bg-slate-100 text-slate-700 font-bold py-1.5 rounded border transition">🎯 中央</button>
             <button id="adjResetBtn" type="button" class="bg-white hover:bg-slate-100 text-slate-700 font-bold py-1.5 rounded border transition">↺ この出力を初期化</button>
@@ -1206,7 +1228,10 @@
           row.innerHTML = `
         <div class="flex items-center justify-between mb-1.5 pb-1 border-b border-slate-100">
           <h3 class="font-bold text-xs text-slate-800">${item.label}</h3>
-          <span class="text-[8px] text-slate-400 font-mono">OFF / ON 横並び</span>
+          <div class="flex items-center gap-1">
+            <button type="button" class="swap-passcode-btn text-[8px] bg-white hover:bg-amber-50 text-amber-800 border border-amber-200 font-bold px-1.5 py-0.5 rounded transition" data-id="${item.id}">↔ OFF/ON入れ替え</button>
+            <span class="text-[8px] text-slate-400 font-mono">OFF / ON</span>
+          </div>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
           <div id="box_${item.id}_off"></div>
@@ -1214,6 +1239,7 @@
         </div>
       `;
           container.appendChild(row);
+          row.querySelector(".swap-passcode-btn").onclick = () => swapPasscodeOffOn(item.id);
 
           createCompactUploader(row.querySelector(`#box_${item.id}_off`), {
             key: `${item.id}_off`,
@@ -1231,6 +1257,8 @@
             badgeText: "ON (入力済)",
             badgeColor: "bg-indigo-100 text-indigo-800 font-bold",
             mode: "contain",
+            isButtonOn: true,
+            pairedOffKey: `${item.id}_off`,
             specs: [
               {targetKey: "ios", os: "iPhone (iOS)", file: item.onIos, w: 120, h: 120},
               {targetKey: "android", os: "Android", file: item.onAnd, w: 116, h: 116}
@@ -2674,6 +2702,26 @@
       triggerAutoSave();
     }
 
+    function ensureDOnEffect(asset) {
+      if (!asset) return null;
+      if (!asset.autoGen) {
+        asset.autoGen = defaultAutoGen();
+      }
+      asset.autoGen.enabled = true;
+      return asset.autoGen;
+    }
+
+    function updateDOnEffect(patch) {
+      const cur = adjCurrent();
+      if (!cur || adjGroupOf(adjState.key) !== "D" || !adjState.key.endsWith("_on")) return;
+      const ag = ensureDOnEffect(cur.a);
+      Object.assign(ag, patch);
+      adjSyncControls();
+      adjDraw();
+      renderPreview();
+      triggerAutoSave();
+    }
+
     function adjSyncControls() {
       const cur = adjCurrent();
       if (!cur) return;
@@ -2704,6 +2752,28 @@
         hint.textContent = "枠の中に画像全体が収まるように表示します。拡大率とX/Y位置で大きさと位置を調整できます。";
       }
 
+      const dOn = adjGroupOf(adjState.key) === "D" && adjState.key.endsWith("_on");
+      const dFx = document.getElementById("adjDOnEffects");
+      if (dFx) dFx.classList.toggle("hidden", !dOn);
+      if (dOn) {
+        const ag = ensureDOnEffect(adjCurrent().a);
+        const setv = (id, value) => { const el = document.getElementById(id); if (el) el.value = value; };
+        setv("adjDAgScaleRange", ag.scaleRatio || 90);
+        setv("adjDAgYRange", ag.yShift || 0);
+        setv("adjDAgNeonToggle", ag.neonEnabled ? "on" : "");
+        const n = document.getElementById("adjDAgNeonToggle"); if (n) n.checked = !!ag.neonEnabled;
+        const np = document.getElementById("adjDAgNeonPicker"); if (np) np.value = ag.neonColor || "#00ffcc";
+        setv("adjDAgNeonBlurRange", getNeonBlur(ag));
+        const nb = document.getElementById("adjDAgNeonBlurVal"); if (nb) nb.textContent = neonBlurLabel(getNeonBlur(ag));
+        const ot = document.getElementById("adjDAgOutlineToggle"); if (ot) ot.checked = !!ag.outlineEnabled;
+        const op = document.getElementById("adjDAgOutlinePicker"); if (op) op.value = ag.outlineColor || "#ffffff";
+        const pt = document.getElementById("adjDAgPillToggle"); if (pt) pt.checked = !!ag.pillEnabled;
+        const pp = document.getElementById("adjDAgPillPicker"); if (pp) pp.value = /^#[0-9a-fA-F]{6}$/.test(ag.pillColor || "") ? ag.pillColor : "#d1fae5";
+        const st = document.getElementById("adjDAgShadowToggle"); if (st) st.checked = !!ag.shadowEnabled;
+        const sv = document.getElementById("adjDAgScaleVal"); if (sv) sv.textContent = (ag.scaleRatio || 90) + "%";
+        const yv = document.getElementById("adjDAgYVal"); if (yv) yv.textContent = (ag.yShift || 0) + "px";
+      }
+
       document.querySelectorAll("#adjSpecTabs button").forEach((btn, j) => {
         const act = j === adjState.idx;
         btn.className = "flex-1 py-1.5 rounded border text-[11px] font-bold transition " + (act ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-slate-600 hover:bg-slate-50");
@@ -2717,7 +2787,8 @@
       const cv = document.getElementById("adjMainCanvas");
       const k = Math.min(1, 360 / Math.max(spec.w, spec.h));
       const W = Math.max(1, Math.round(spec.w * k)), H = Math.max(1, Math.round(spec.h * k));
-      drawCropToCanvas(cv, a.img, W, H, conf.scale, conf.x, conf.y, opt.mode, opt.forceOpaque);
+      const drawAg = (adjGroupOf(adjState.key) === "D" && adjState.key.endsWith("_on")) ? ensureDOnEffect(a) : null;
+      drawCropToCanvas(cv, a.img, W, H, conf.scale, conf.x, conf.y, opt.mode, opt.forceOpaque, drawAg);
       cv.style.width = W + "px";
       cv.style.height = H + "px";
       document.getElementById("adjOutInfo").textContent = `${spec.os} ${spec.w}×${spec.h}px ／ 元画像 ${a.img.naturalWidth}×${a.img.naturalHeight}px`;
@@ -2859,6 +2930,17 @@
       $("adjScaleRange").oninput = (e) => adjChange({scale: parseFloat(e.target.value)});
       $("adjXRange").oninput = (e) => adjChange({x: parseFloat(e.target.value)});
       $("adjYRange").oninput = (e) => adjChange({y: parseFloat(e.target.value)});
+
+      $("adjDAgScaleRange").oninput = (e) => updateDOnEffect({scaleRatio: parseInt(e.target.value)});
+      $("adjDAgYRange").oninput = (e) => updateDOnEffect({yShift: parseInt(e.target.value)});
+      $("adjDAgNeonToggle").onchange = (e) => updateDOnEffect({neonEnabled: e.target.checked});
+      $("adjDAgNeonPicker").oninput = (e) => updateDOnEffect({neonColor: e.target.value});
+      $("adjDAgNeonBlurRange").oninput = (e) => updateDOnEffect({neonBlur: parseInt(e.target.value)});
+      $("adjDAgOutlineToggle").onchange = (e) => updateDOnEffect({outlineEnabled: e.target.checked});
+      $("adjDAgOutlinePicker").oninput = (e) => updateDOnEffect({outlineColor: e.target.value});
+      $("adjDAgPillToggle").onchange = (e) => updateDOnEffect({pillEnabled: e.target.checked});
+      $("adjDAgPillPicker").oninput = (e) => updateDOnEffect({pillColor: e.target.value});
+      $("adjDAgShadowToggle").onchange = (e) => updateDOnEffect({shadowEnabled: e.target.checked});
 
       $("adjCenterBtn").onclick = () => {
         const cur = adjCurrent();
@@ -3394,6 +3476,25 @@
       createCroppedBlob(assetData, conf, targetW, targetH, mode, forceOpaque).then(blob => {
         if (blob) saveAs(blob, filename);
       });
+    }
+
+    function swapPasscodeOffOn(itemId) {
+      const offKey = `${itemId}_off`;
+      const onKey = `${itemId}_on`;
+      const off = state.assets[offKey];
+      const on = state.assets[onKey];
+      if (!off && !on) {
+        alert("この桁にはまだOFF/ON画像がありません。");
+        return;
+      }
+      state.assets[offKey] = on || null;
+      state.assets[onKey] = off || null;
+      if (!state.assets[offKey]) delete state.assets[offKey];
+      if (!state.assets[onKey]) delete state.assets[onKey];
+      // DではON加工設定も画像と一緒に持ち替える。
+      renderSectionContent("D");
+      renderPreview();
+      triggerAutoSave();
     }
 
     function copyPasscode1toAll() {
