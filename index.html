@@ -2910,10 +2910,25 @@
     function adjStep(dir) {
       const group = adjGroupOf(adjState.key);
       const keys = adjTargetKeys(group).filter(k => adjHasImage(k) && assetOptRegistry[k]);
-      if (keys.length < 2) return;
-      const i = keys.indexOf(adjState.key);
-      const next = keys[(i + dir + keys.length) % keys.length];
-      adjLoadTarget(next, adjState.idx);
+
+      // 複数の画像があるグループは「画像」単位で移動。
+      if (keys.length >= 2) {
+        const i = keys.indexOf(adjState.key);
+        const next = keys[(i + dir + keys.length) % keys.length];
+        adjLoadTarget(next, adjState.idx);
+        adjSetStatus("調整は自動で保存されます", false);
+        return;
+      }
+
+      // A/C/Fなど、元画像が1枚で出力先が複数ある場合は、
+      // 「前の画像 / 次の画像」を出力先（iOS / Android / STORE等）の切替として機能させる。
+      const curOpt = assetOptRegistry[adjState.key];
+      if (!curOpt || !curOpt.specs || curOpt.specs.length < 2) return;
+      const nextIdx = (adjState.idx + dir + curOpt.specs.length) % curOpt.specs.length;
+      adjState.idx = nextIdx;
+      adjBuildTabs();
+      adjSyncControls();
+      adjDraw();
       adjSetStatus("調整は自動で保存されます", false);
     }
 
