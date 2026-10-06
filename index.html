@@ -113,12 +113,14 @@
 
     #mobilePreviewModal,
     #cropperStudioModal,
+    #assetAdjustModal,
     #menuStudioModal {
       transition: opacity 0.2s ease, visibility 0.2s ease;
     }
 
     #mobilePreviewModal.active,
     #cropperStudioModal.active,
+    #assetAdjustModal.active,
     #menuStudioModal.active {
       opacity: 1;
       visibility: visible;
@@ -156,9 +158,14 @@
           class="text-[10px] md:text-xs font-bold bg-slate-900 hover:bg-black text-white px-2.5 py-1 rounded shadow flex items-center gap-1 transition">
           <span>📦 ZIP出力</span>
         </button>
+        <button id="resetAdjustBtn"
+          class="text-[10px] md:text-xs font-medium bg-white/10 hover:bg-amber-500 hover:text-white px-2 py-1 rounded transition whitespace-nowrap"
+          title="画像は残したまま、配置・拡大縮小・トリミング・各種調整だけを初期状態に戻します">
+          ↩️ 調整リセット
+        </button>
         <button id="resetAllBtn"
           class="text-[10px] md:text-xs font-medium bg-white/10 hover:bg-red-500 hover:text-white px-2 py-1 rounded transition"
-          title="すべてリセット">
+          title="すべてリセット（画像も含めてすべて消去）">
           ↺
         </button>
       </div>
@@ -321,6 +328,108 @@
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ★★★ D/E/F 画像調整モーダル ★★★ -->
+  <div id="assetAdjustModal"
+    class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-2 md:p-4 opacity-0 pointer-events-none transition-all">
+    <div class="bg-white w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[96vh]">
+      <div class="bg-slate-900 text-white px-4 py-3 flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2 min-w-0">
+          <span class="text-lg">🎛️</span>
+          <div class="min-w-0">
+            <h3 class="font-bold text-sm md:text-base flex items-center gap-2">
+              <span>画像の調整</span>
+              <span id="adjTargetBadge" class="bg-emerald-600 text-white text-[11px] px-2 py-0.5 rounded font-mono font-bold truncate">-</span>
+            </h3>
+            <p id="adjSubLabel" class="text-[10px] text-emerald-400">出力サイズどおりの見え方で調整できます</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <select id="adjTargetSelect" class="bg-slate-800 text-white text-xs font-bold px-2 py-1.5 rounded border border-slate-700 cursor-pointer max-w-[150px]"></select>
+          <button id="adjCloseBtn" type="button" class="text-slate-400 hover:text-white text-sm bg-slate-800 hover:bg-slate-700 w-7 h-7 rounded-full flex items-center justify-center" title="閉じる（保存されます）">✕</button>
+        </div>
+      </div>
+
+      <div class="flex-1 overflow-y-auto p-3 md:p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- 左: 出力イメージ -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between text-[10px]">
+            <span class="font-bold text-slate-700">出力イメージ（ZIPに入る画像）</span>
+            <span id="adjOutInfo" class="font-mono text-slate-500">-</span>
+          </div>
+          <div class="checker-bg border border-slate-300 rounded-lg p-2 flex items-center justify-center">
+            <div id="adjCanvasWrap" class="relative inline-block touch-none select-none cursor-move">
+              <canvas id="adjMainCanvas" class="block"></canvas>
+              <div id="adjCircleGuide" class="hidden absolute inset-0 rounded-full border-2 border-dashed border-emerald-500 pointer-events-none"></div>
+            </div>
+          </div>
+          <p class="text-[9px] text-slate-500">ドラッグで位置、ホイール（またはスライダー）で拡大縮小できます。</p>
+          <div id="adjMiniMapBox" class="hidden bg-slate-50 border rounded-lg p-2">
+            <div class="flex items-center justify-between text-[10px] mb-1">
+              <span class="font-bold text-slate-700">表示範囲（元画像のどこを使っているか）</span>
+              <span id="adjMiniMapInfo" class="font-mono text-emerald-700"></span>
+            </div>
+            <canvas id="adjMiniMap" class="block mx-auto"></canvas>
+          </div>
+          <div id="adjDevBox" class="hidden bg-slate-50 border rounded-lg p-2">
+            <span class="text-[10px] font-bold text-slate-700 block mb-1">実機（縦長画面）での見え方</span>
+            <canvas id="adjDevCanvas" class="block mx-auto border border-slate-300 rounded"></canvas>
+          </div>
+        </div>
+
+        <!-- 右: 調整 -->
+        <div class="space-y-3 text-xs">
+          <div>
+            <span class="text-[10px] font-bold text-slate-500 block mb-1">調整する出力</span>
+            <div id="adjSpecTabs" class="flex gap-1"></div>
+            <label id="adjLinkRow" class="mt-1.5 flex items-center gap-1.5 text-[10px] text-slate-600 cursor-pointer select-none">
+              <input type="checkbox" id="adjLinkChk" class="rounded text-emerald-600">
+              <span>iPhone / Android に同じ調整を反映（連動）</span>
+            </label>
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <span class="font-bold text-slate-700">🔍 拡大率</span>
+              <span id="adjScaleVal" class="font-mono font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded text-[11px]">100%</span>
+            </div>
+            <input type="range" id="adjScaleRange" min="10" max="300" step="1" value="100" class="w-full">
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <span class="font-bold text-slate-700">↔️ 水平位置 (X)</span>
+              <span id="adjXVal" class="font-mono font-bold text-slate-800 bg-white border px-2 py-0.5 rounded text-[11px]">0%</span>
+            </div>
+            <input type="range" id="adjXRange" min="-100" max="100" step="0.5" value="0" class="w-full">
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <span class="font-bold text-slate-700">↕️ 垂直位置 (Y)</span>
+              <span id="adjYVal" class="font-mono font-bold text-slate-800 bg-white border px-2 py-0.5 rounded text-[11px]">0%</span>
+            </div>
+            <input type="range" id="adjYRange" min="-100" max="100" step="0.5" value="0" class="w-full">
+          </div>
+          <p id="adjHint" class="text-[10px] text-slate-500 bg-slate-50 border rounded p-2 leading-snug"></p>
+
+          <div class="grid grid-cols-2 gap-2">
+            <button id="adjCenterBtn" type="button" class="bg-white hover:bg-slate-100 text-slate-700 font-bold py-1.5 rounded border transition">🎯 中央</button>
+            <button id="adjResetBtn" type="button" class="bg-white hover:bg-slate-100 text-slate-700 font-bold py-1.5 rounded border transition">↺ この出力を初期化</button>
+            <button id="adjRevertBtn" type="button" class="col-span-2 bg-white hover:bg-amber-50 text-amber-800 font-bold py-1.5 rounded border border-amber-200 transition">↩ 開いた時点の状態に戻す</button>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <button id="adjPrevBtn" type="button" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-1.5 rounded border transition">◀ 前の画像</button>
+            <button id="adjNextBtn" type="button" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-1.5 rounded border transition">次の画像 ▶</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-slate-50 border-t px-4 py-2.5 flex items-center justify-between gap-2">
+        <span id="adjStatus" class="text-[11px] font-bold text-slate-500">調整は自動で保存されます</span>
+        <button id="adjDoneBtn" type="button" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg shadow transition">💾 保存して閉じる</button>
       </div>
     </div>
   </div>
@@ -490,6 +599,9 @@
                 <button id="mStudioResetBtn"
                   class="bg-white hover:bg-slate-100 text-slate-700 font-bold py-1.5 rounded border transition">↺
                   初期化</button>
+                <button id="mStudioAutoFitBtn" type="button"
+                  class="col-span-2 bg-white hover:bg-emerald-50 text-emerald-800 font-bold py-1.5 rounded border border-emerald-200 transition"
+                  title="拡大率は変えず、実際に描かれている範囲の中央・下端だけを揃えます">📐 中央・下端に配置（サイズは変えません）</button>
               </div>
             </div>
 
@@ -551,6 +663,16 @@
                     <input type="color" id="mAgOutlinePicker" value="#ffffff"
                       class="w-4 h-4 rounded cursor-pointer p-0 bg-transparent">
                   </div>
+                </div>
+
+                <div class="bg-white p-1.5 rounded border border-slate-200 text-[10px]">
+                  <label class="block">
+                    ネオン範囲（広がり）: <b id="mAgNeonBlurVal" class="font-mono text-cyan-700">標準 (14)</b>
+                    <input type="range" id="mAgNeonBlurRange" min="2" max="30" step="1" value="14" class="w-full">
+                  </label>
+                  <div class="flex justify-between text-[8px] text-slate-400"><span>狭い</span><span>標準</span><span>広い</span></div>
+                  <p class="text-[8px] text-slate-500 mt-0.5">絵の大きさ・位置は変わらず、外側ににじむ範囲だけが変わります。</p>
+                  <p id="mAgNeonClipWarn" class="hidden text-[9px] text-amber-700 font-bold mt-1">⚠ ネオンなどの効果が出力の枠で見切れています。ネオン範囲を小さくしてください。</p>
                 </div>
 
                 <div class="grid grid-cols-2 gap-1.5 bg-white p-1.5 rounded border border-slate-200 text-[10px]">
@@ -665,6 +787,8 @@
         currentView: state.currentView,
         currentDevice: state.currentDevice,
         talkBgColor: state.talkBgColor,
+        talkBgNone: !!state.talkBgNone,
+        menuInheritOwn: state.menuOwn,
         studioSourceDataUrl: studioState.sourceImg ? studioState.sourceImg.src : null,
         menuInheritCustom: state.menuCustom,
         assets: cleanAssets
@@ -689,6 +813,7 @@
           state.currentView = data.currentView || "home";
           state.currentDevice = data.currentDevice || "ios";
           if (data.talkBgColor) state.talkBgColor = data.talkBgColor;
+          state.talkBgNone = !!data.talkBgNone;
 
           if (data.studioSourceDataUrl) {
             const sImg = new Image();
@@ -745,6 +870,15 @@
             state.menuCustom = {};
             SECTIONS.B.items.forEach(it => {
               if (it.inheritFrom && menuButtonHasContent(it.id)) state.menuCustom[it.id] = true;
+            });
+          }
+          if (data.menuInheritOwn && typeof data.menuInheritOwn === "object") {
+            state.menuOwn = {...data.menuInheritOwn};
+          } else {
+            // 旧データ: 個別編集済みで中身のある子は、素材を守るため「自分の素材あり」とみなす
+            state.menuOwn = {};
+            SECTIONS.B.items.forEach(it => {
+              if (it.inheritFrom && state.menuCustom[it.id] && menuButtonHasContent(it.id)) state.menuOwn[it.id] = true;
             });
           }
           resolve(true);
@@ -871,6 +1005,8 @@
       showBadgeGuide: false,
       talkBgColor: "#edf8fb",
       assets: {},
+      talkBgNone: false, // F: 背景なし（透過）を選択中か（画像・調整値は保持したまま切り替え）
+      menuOwn: {},      // 子ボタンIDごとの「自分の素材(アップロード/コピー)を持つ」フラグ（保存対象）
       menuCustom: {},   // 子ボタンIDごとの「個別編集済み」フラグ（保存対象）
       menuSynced: {}    // 子ボタンIDごとの「最後に継承した親の状態シグネチャ」（メモリのみ）
     };
@@ -889,6 +1025,7 @@
       setupMobileModal();
       setupCropperStudio();
       setupMenuButtonStudio();
+      setupAssetAdjuster();
       switchTab(state.currentTab);
 
       if (restored) {
@@ -1107,6 +1244,41 @@
           });
         });
       } else if (key === "F") {
+        // ★ 背景画像を使う / 背景なし（透過）の切り替え（画像・調整値は削除しない）
+        const modeCard = document.createElement("div");
+        modeCard.className = "card bg-slate-50 border-emerald-200 mb-3";
+        modeCard.innerHTML = `
+      <div class="flex items-center justify-between mb-1.5">
+        <span class="text-xs font-bold text-slate-800">🖼️ トーク背景の使用</span>
+        <span id="talkBgModeState" class="text-[10px] font-bold px-1.5 py-0.5 rounded"></span>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <button type="button" id="talkBgUseImageBtn" class="py-1.5 rounded-lg border text-[11px] font-bold transition">🖼️ 背景画像を使う</button>
+        <button type="button" id="talkBgNoneBtn" class="py-1.5 rounded-lg border text-[11px] font-bold transition">🚫 背景なし（透過）</button>
+      </div>
+      <p class="text-[10px] text-slate-500 mt-1.5 leading-snug">
+        「背景なし」にすると、背景画像を使わず背景色のみで表示します（出力は同じ名前・サイズの完全透過PNGになります）。
+        アップロード済みの画像と調整内容は消えません。「背景画像を使う」で元に戻せます。
+      </p>`;
+        container.appendChild(modeCard);
+        const refreshBgMode = () => {
+          const none = !!state.talkBgNone;
+          const on = "bg-emerald-600 text-white border-emerald-600", off = "bg-white text-slate-600 border-slate-300 hover:bg-slate-50";
+          modeCard.querySelector("#talkBgUseImageBtn").className = "py-1.5 rounded-lg border text-[11px] font-bold transition " + (none ? off : on);
+          modeCard.querySelector("#talkBgNoneBtn").className = "py-1.5 rounded-lg border text-[11px] font-bold transition " + (none ? on : off);
+          const st = modeCard.querySelector("#talkBgModeState");
+          st.textContent = none ? "現在: 背景なし（透過）" : "現在: 背景画像を使用";
+          st.className = "text-[10px] font-bold px-1.5 py-0.5 rounded " + (none ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800");
+          const imgCard = document.getElementById("card_talk_bg");
+          if (imgCard) imgCard.classList.toggle("opacity-60", none);
+        };
+        modeCard.querySelector("#talkBgUseImageBtn").onclick = () => {
+          state.talkBgNone = false; refreshBgMode(); renderPreview(); triggerAutoSave();
+        };
+        modeCard.querySelector("#talkBgNoneBtn").onclick = () => {
+          state.talkBgNone = true; refreshBgMode(); renderPreview(); triggerAutoSave();
+        };
+
         const colorCard = document.createElement("div");
         colorCard.className = "card bg-slate-50 border-emerald-200 mb-3";
         colorCard.innerHTML = `
@@ -1176,6 +1348,7 @@
         s.items.forEach(item => {
           const el = document.createElement("div");
           el.className = "card";
+          el.id = "card_talk_bg";
           container.appendChild(el);
 
           createCompactUploader(el, {
@@ -1189,6 +1362,7 @@
             onImageLoaded: (img) => sampleColorFromTop(img)
           });
         });
+        refreshBgMode();
       } else {
         s.items.forEach(item => {
           const el = document.createElement("div");
@@ -1275,7 +1449,59 @@
     // =========================================================================
     // 4. コンパクトアップローダーコンポーネント (ON特大プレビュー＆削除機能)
     // =========================================================================
+    // ON効果の初期値（新規素材・調整リセットで共通に使用）
+    function defaultAutoGen() {
+      return {
+        enabled: false,
+        scaleRatio: 90,
+        yShift: 0,
+        brightness: 100,
+        saturate: 100,
+        monochromeOff: false,
+        colorOverlayEnabled: false,
+        colorOverlayColor: "#00C300",
+        outlineEnabled: false,
+        outlineColor: "#ffffff",
+        outlineWidth: 2.5,
+        neonEnabled: false,
+        neonColor: "#00ffcc",
+        neonBlur: 14,
+        shadowEnabled: false,
+        shadowColor: "rgba(0,0,0,0.45)",
+        shadowBlur: 8,
+        shadowY: 3,
+        indicatorEnabled: false,
+        indicatorType: "bar",
+        indicatorColor: "#00C300",
+        pillEnabled: false,
+        pillShape: "circle",
+        pillColor: "rgba(0,195,0,0.18)"
+      };
+    }
+
+    // ネオンの広がり(範囲)。保存データに neonBlur が無い場合は標準値(14)
+    function getNeonBlur(ag) {
+      const v = Number(ag && ag.neonBlur);
+      return v > 0 ? v : 14;
+    }
+    function neonBlurLabel(v) {
+      return (v <= 9 ? "狭い" : (v <= 18 ? "標準" : "広い")) + ` (${v})`;
+    }
+
+    // 描画結果の外周1pxに絵(ネオン等)が残っていれば、枠で見切れている
+    function canvasEdgeHasInk(cv) {
+      try {
+        const w = cv.width, h = cv.height;
+        if (w < 3 || h < 3) return false;
+        const ctx = cv.getContext("2d");
+        const rows = [ctx.getImageData(0, 0, w, 1).data, ctx.getImageData(0, h - 1, w, 1).data];
+        const cols = [ctx.getImageData(0, 0, 1, h).data, ctx.getImageData(w - 1, 0, 1, h).data];
+        return [...rows, ...cols].some(d => {for (let i = 3; i < d.length; i += 4) if (d[i] > 12) return true; return false;});
+      } catch (e) {return false;}
+    }
+
     function createCompactUploader(parent, opt) {
+      assetOptRegistry[opt.key] = opt;   // D/E/F 調整モーダルが出力サイズ・モードを参照するための登録
       if (!state.assets[opt.key]) {
         state.assets[opt.key] = {
           img: null,
@@ -1287,32 +1513,7 @@
           filesize: "",
           mode: opt.mode,
           forceOpaque: opt.forceOpaque,
-          autoGen: {
-            enabled: false,
-            scaleRatio: 90,
-            yShift: 0,
-            brightness: 100,
-            saturate: 100,
-            monochromeOff: false,
-            colorOverlayEnabled: false,
-            colorOverlayColor: "#00C300",
-            outlineEnabled: false,
-            outlineColor: "#ffffff",
-            outlineWidth: 2.5,
-            neonEnabled: false,
-            neonColor: "#00ffcc",
-            neonBlur: 14,
-            shadowEnabled: false,
-            shadowColor: "rgba(0,0,0,0.45)",
-            shadowBlur: 8,
-            shadowY: 3,
-            indicatorEnabled: false,
-            indicatorType: "bar",
-            indicatorColor: "#00C300",
-            pillEnabled: false,
-            pillShape: "circle",
-            pillColor: "rgba(0,195,0,0.18)"
-          },
+          autoGen: defaultAutoGen(),
           autoGenFrom: null,
           specsConfig: opt.specs.map(() => ({scale: 100, x: 0, y: 0}))
         };
@@ -1422,6 +1623,8 @@
           if (opt.key.startsWith("B_")) {
             const itemId = opt.parentItemKey || opt.key.split('_').slice(0, 2).join('_');
             openMenuButtonStudio(itemId);
+          } else if (adjGroupOf(opt.key)) {
+            openAssetAdjuster(opt.key, parseInt(btn.dataset.idx) || 0);
           }
         };
       });
@@ -1474,7 +1677,7 @@
         reader.onload = (e) => {
           const img = new Image();
           img.onload = () => {
-            if (opt.parentItemKey) markMenuCustom(opt.parentItemKey);   // 子に直接アップロード = 個別編集
+            if (opt.parentItemKey) {markMenuCustom(opt.parentItemKey); markMenuOwn(opt.parentItemKey);}   // 子に直接アップロード = 個別編集＋自分の素材
             data.rawSourceImg = img;
             data.img = img;
             data.cropConfig = {scale: 100, x: 0, y: 0};
@@ -1495,6 +1698,24 @@
                 onData.maskDataUrl = null;
                 onData.autoGenFrom = opt.key;
               }
+            }
+
+            // ★ B: 透明PNGは「実際に描かれている範囲(alpha外接矩形)」を基準に初期配置を自動調整
+            if (opt.key.startsWith("B_") && (opt.key.endsWith("_off") || opt.isButtonOn)) {
+              applyBAutoPlacement(data, img, (applied) => {
+                if (!applied) return;
+                if (opt.key.endsWith("_off")) {
+                  const on = state.assets[opt.key.replace("_off", "_on")];
+                  if (on) {
+                    on.img = data.img;
+                    on.cropConfig = {...data.cropConfig};
+                    on.specsConfig = data.specsConfig.map(c => ({...c}));
+                  }
+                }
+                renderSectionContent(state.currentTab);
+                renderPreview();
+                triggerAutoSave();
+              });
             }
 
             emptyView.classList.add("hidden");
@@ -1613,7 +1834,7 @@
       if (ag.neonEnabled) {
         ctx.save();
         ctx.shadowColor = ag.neonColor || "#00ffcc";
-        ctx.shadowBlur = (ag.neonBlur || 16) * (w / 100);
+        ctx.shadowBlur = getNeonBlur(ag) * (w / 100);
         ctx.drawImage(charImg, dx, dy, dw, dh);
         ctx.drawImage(charImg, dx, dy, dw, dh);
         ctx.restore();
@@ -1700,6 +1921,20 @@
       const yRange = document.getElementById("mStudioYRange");
       const centerBtn = document.getElementById("mStudioCenterBtn");
       const resetBtn = document.getElementById("mStudioResetBtn");
+
+      document.getElementById("mStudioAutoFitBtn").onclick = () => {
+        ensureOffEditing();
+        const offAsset = state.assets[`${menuStudioState.currentItemId}_off`];
+        const raw = offAsset && (offAsset.rawSourceImg || offAsset.img);
+        const conf = raw ? computeBAutoCropConfig(raw, offAsset.cropConfig ? offAsset.cropConfig.scale : 100) : null;
+        if (!conf) {
+          alert("自動で配置できるのは、透明な余白を含むPNG画像を登録しているときです。\n（背景が不透明な画像は、そのまま手動で調整してください）");
+          return;
+        }
+        offAsset.cropConfig = conf;   // 拡大率はそのまま。X位置と下端位置だけを調整
+        syncStudioSliders();
+        drawMenuStudio();
+      };
 
       const prevItemBtn = document.getElementById("mStudioPrevItemBtn");
       const nextItemBtn = document.getElementById("mStudioNextItemBtn");
@@ -2033,6 +2268,13 @@
         triggerOnEffectChange(ag => {ag.neonColor = e.target.value;});
       };
 
+      document.getElementById("mAgNeonBlurRange").oninput = (e) => {
+        triggerOnEffectChange(ag => {
+          ag.neonBlur = parseInt(e.target.value);
+          document.getElementById("mAgNeonBlurVal").textContent = neonBlurLabel(ag.neonBlur);
+        });
+      };
+
       agOutline.onchange = (e) => {
         triggerOnEffectChange(ag => {ag.outlineEnabled = e.target.checked;});
       };
@@ -2140,6 +2382,7 @@
         if (!clone) return count;
         applyMenuButtonClone(tid, clone);
         markMenuCustom(tid);   // 明示的な上書きコピー → 以後は親の変更で自動上書きしない
+        markMenuOwn(tid);
         count++;
       }
       return count;
@@ -2149,6 +2392,14 @@
     // ★ 関連アイコン間の自動継承（親 → 子）
     //   SECTIONS.B.items の inheritFrom に親を定義。子が「個別編集済み」でない間だけ親の状態を複製して継承する。
     // =========================================================================
+    // 子が自分の素材（アップロード／明示コピー）を持つことを記録（調整リセットでも素材を守るため）
+    function markMenuOwn(itemId) {
+      const meta = SECTIONS.B.items.find(it => it.id === itemId);
+      if (!meta || !meta.inheritFrom || state.menuOwn[itemId]) return;
+      state.menuOwn[itemId] = true;
+      triggerAutoSave();
+    }
+
     function markMenuCustom(itemId) {
       const meta = SECTIONS.B.items.find(it => it.id === itemId);
       if (!meta || !meta.inheritFrom) return;   // 親を持たないボタン(1,2,3,6,8)は対象外
@@ -2292,6 +2543,450 @@
       };
     }
 
+    // =========================================================================
+    // ★ B: 透明PNGの「配置のみ」自動調整
+    //   アイコンの大きさ(拡大率)は自動では一切変更しない。
+    //   アップロード直後の初期配置として、X位置（中央）と絵の下端位置だけを揃える。
+    //   以降の拡大縮小・X/Yは専用スタジオから自由に手動調整できる。
+    // =========================================================================
+    const B_AUTO = {
+      baseline: 0.95,    // 絵の下端：正方形上端からの位置（全アイコン共通のベースライン）
+      alphaMin: 24       // この値以上の alpha を「描かれている」とみなす
+    };
+
+    function measureAlphaBounds(img) {
+      const natW = img.naturalWidth, natH = img.naturalHeight;
+      if (!natW || !natH) return null;
+      const k = Math.min(1, 1024 / Math.max(natW, natH));
+      const w = Math.max(1, Math.round(natW * k)), h = Math.max(1, Math.round(natH * k));
+      const cv = document.createElement("canvas");
+      cv.width = w; cv.height = h;
+      const ctx = cv.getContext("2d", {willReadFrequently: true});
+      ctx.drawImage(img, 0, 0, w, h);
+      let data;
+      try {data = ctx.getImageData(0, 0, w, h).data;} catch (e) {return null;}
+      let minX = w, minY = h, maxX = -1, maxY = -1, hasTransparent = false;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const a = data[(y * w + x) * 4 + 3];
+          if (a < 250) hasTransparent = true;
+          if (a >= B_AUTO.alphaMin) {
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+      if (maxX < 0) return null;
+      return {
+        x: minX / k, y: minY / k,
+        w: (maxX - minX + 1) / k, h: (maxY - minY + 1) / k,
+        natW, natH, hasTransparent
+      };
+    }
+
+    // 戻り値: {scale, x, y}。scale は引数をそのまま返す（自動で変更しない）。
+    // 透明部分のない画像は配置調整しないため null。
+    function computeBAutoCropConfig(img, scale) {
+      const sc = (scale > 0) ? scale : 100;
+      const b = measureAlphaBounds(img);
+      if (!b || !b.hasTransparent || b.w < 1 || b.h < 1) return null;
+
+      // drawCropToCanvas の "contain"（padding 0.88）と同じ式で、現在のサイズでの描画寸法を求める
+      const aspect = b.natW / b.natH, f = sc / 100;
+      let dw, dh;
+      if (aspect >= 1) {dw = 0.88 * f; dh = dw / aspect;} else {dh = 0.88 * f; dw = dh * aspect;}
+
+      // 絵の下端 = baseline、絵の中心X = 0.5 になる x / y(%) だけを逆算
+      const y = (B_AUTO.baseline - (1 - dh) / 2 - ((b.y + b.h) / b.natH) * dh) * 100;
+      const x = (0.5 - (1 - dw) / 2 - ((b.x + b.w / 2) / b.natW) * dw) * 100;
+      const r1 = (v) => Math.round(Math.min(800, Math.max(-800, v)) * 10) / 10;
+      return {scale: sc, x: r1(x), y: r1(y)};
+    }
+
+    // 元画像から配置のみ自動調整し、スタジオ保存時と同じ方式の正方形画像を data.img に反映する
+    function applyBAutoPlacement(data, rawImg, done) {
+      const conf = computeBAutoCropConfig(rawImg, 100);
+      if (!conf) {done(false); return;}
+      const cv = document.createElement("canvas");
+      drawCropToCanvas(cv, rawImg, 400, 400, conf.scale, conf.x, conf.y, "contain", false);
+      const sq = new Image();
+      sq.onload = () => {
+        data.cropConfig = conf;
+        data.img = sq;
+        data.rawSourceImg = rawImg;
+        data.specsConfig = [{scale: 100, x: 0, y: 0}, {scale: 100, x: 0, y: 0}];
+        done(true);
+      };
+      sq.onerror = () => done(false);
+      sq.src = cv.toDataURL("image/png");
+    }
+
+    // =========================================================================
+    // ★ D / E / F: 画像調整モーダル（出力ごとの specsConfig を直接編集）
+    //   B専用のIDやspecsConfigは使わず、各アップローダーが持つ spec（出力サイズ）と mode をそのまま使う。
+    // =========================================================================
+    const assetOptRegistry = {};
+    const adjState = {key: null, idx: 0, linked: false, snapshot: null, drag: null, raf: 0, observer: null, statusTimer: null};
+
+    function adjGroupOf(key) {
+      if (key.startsWith("pass_")) return "D";
+      if (key.startsWith("profile_")) return "E";
+      if (key === "talk_bg") return "F";
+      return null;
+    }
+
+    function adjTargetKeys(group) {
+      if (group === "D") return SECTIONS.D.items.flatMap(it => [`${it.id}_off`, `${it.id}_on`]);
+      return SECTIONS[group].items.map(it => it.id);
+    }
+
+    function adjTargetLabel(key) {
+      const g = adjGroupOf(key);
+      if (g === "D") {
+        const id = key.replace(/_(off|on)$/, "");
+        const it = SECTIONS.D.items.find(x => x.id === id);
+        return `D: ${it ? it.label : id} ${key.endsWith("_on") ? "ON(入力済)" : "OFF(未入力)"}`;
+      }
+      const it = SECTIONS[g].items.find(x => x.id === key);
+      return `${g}: ${it ? it.label : key}`;
+    }
+
+    function adjHasImage(key) {
+      const a = state.assets[key];
+      return !!(a && a.img);
+    }
+
+    // モードごとの調整可能範囲（cover系は画像が足りなくならない範囲に制限＝引き伸ばし・隙間を防ぐ）
+    function adjLimits(opt, spec, img, scale) {
+      if (opt.mode === "cover" || opt.mode === "bottom-cover") {
+        const ia = img.naturalWidth / img.naturalHeight, ta = spec.w / spec.h, sc = scale / 100;
+        let dw, dh;
+        if (ia > ta) {dh = spec.h * sc; dw = dh * ia;} else {dw = spec.w * sc; dh = dw / ia;}
+        const xm = Math.max(0, (dw - spec.w) / 2) / spec.w * 100;
+        let ymin, ymax;
+        if (opt.mode === "bottom-cover") {
+          ymin = 0;
+          ymax = Math.max(0, (dh - spec.h) / spec.h * 100);
+        } else {
+          const ym = Math.max(0, (dh - spec.h) / 2) / spec.h * 100;
+          ymin = -ym; ymax = ym;
+        }
+        return {smin: 100, smax: 300, xmin: -xm, xmax: xm, ymin, ymax};
+      }
+      return {smin: 10, smax: 300, xmin: -100, xmax: 100, ymin: -100, ymax: 100};
+    }
+
+    function adjClampConf(opt, spec, img, conf) {
+      const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+      const base = adjLimits(opt, spec, img, 100);
+      const scale = clamp(Number(conf.scale), base.smin, base.smax);
+      const lim = adjLimits(opt, spec, img, scale);
+      const r1 = (v) => Math.round(v * 10) / 10;
+      return {
+        scale: r1(scale),
+        x: r1(clamp(Number(conf.x), lim.xmin, lim.xmax)),
+        y: r1(clamp(Number(conf.y), lim.ymin, lim.ymax))
+      };
+    }
+
+    function adjCurrent() {
+      const key = adjState.key;
+      const opt = assetOptRegistry[key];
+      const a = state.assets[key];
+      if (!opt || !a || !a.img) return null;
+      return {key, opt, a, spec: opt.specs[adjState.idx], conf: a.specsConfig[adjState.idx]};
+    }
+
+    function adjSetStatus(text, isOk) {
+      const el = document.getElementById("adjStatus");
+      if (!el) return;
+      el.textContent = text;
+      el.className = "text-[11px] font-bold " + (isOk ? "text-emerald-700" : "text-slate-500");
+    }
+
+    // 調整値を反映（連動ONなら全出力へ）。この資産(adjState.key)の specsConfig だけを書き換える
+    function adjChange(patch) {
+      const cur = adjCurrent();
+      if (!cur) return;
+      const {opt, a} = cur;
+      a.specsConfig[adjState.idx] = adjClampConf(opt, cur.spec, a.img, {...a.specsConfig[adjState.idx], ...patch});
+      if (adjState.linked) {
+        const src = a.specsConfig[adjState.idx];
+        opt.specs.forEach((sp, j) => {
+          if (j !== adjState.idx) a.specsConfig[j] = adjClampConf(opt, sp, a.img, src);
+        });
+      }
+      adjAfterChange();
+    }
+
+    function adjAfterChange() {
+      adjSyncControls();
+      adjDraw();
+      adjSetStatus("💾 保存中…", false);
+      if (!adjState.raf) {
+        adjState.raf = requestAnimationFrame(() => {
+          adjState.raf = 0;
+          renderPreview();   // 実機プレビューへ即時反映
+        });
+      }
+      triggerAutoSave();
+    }
+
+    function adjSyncControls() {
+      const cur = adjCurrent();
+      if (!cur) return;
+      const {opt, a, spec} = cur;
+      const conf = a.specsConfig[adjState.idx];
+      const base = adjLimits(opt, spec, a.img, 100);
+      const lim = adjLimits(opt, spec, a.img, conf.scale);
+      const set = (id, min, max, val) => {
+        const el = document.getElementById(id);
+        // 刻み幅(0.5)の倍数に丸めた範囲にする（実際の上限・下限は adjClampConf が保証する）
+        const lo = Math.floor(min * 2) / 2, hi = Math.ceil(max * 2) / 2;
+        el.min = lo; el.max = hi; el.value = val;
+        el.disabled = (hi - lo) <= 0.0001;
+      };
+      set("adjScaleRange", base.smin, base.smax, conf.scale);
+      set("adjXRange", lim.xmin, lim.xmax, conf.x);
+      set("adjYRange", lim.ymin, lim.ymax, conf.y);
+      document.getElementById("adjScaleVal").textContent = conf.scale.toFixed(0) + "%";
+      document.getElementById("adjXVal").textContent = conf.x.toFixed(1) + "%";
+      document.getElementById("adjYVal").textContent = conf.y.toFixed(1) + "%";
+
+      const hint = document.getElementById("adjHint");
+      if (opt.mode === "bottom-cover") {
+        hint.textContent = "元画像の縦横比は変えず、画面いっぱいに表示します。拡大率で見える範囲を絞り、Y位置を上げると画像の上側（空など）がより多く見えます。";
+      } else if (opt.mode === "cover") {
+        hint.textContent = "元画像の縦横比は変えず、枠いっぱいに表示します。拡大率とX/Y位置で見せたい部分を選べます。";
+      } else {
+        hint.textContent = "枠の中に画像全体が収まるように表示します。拡大率とX/Y位置で大きさと位置を調整できます。";
+      }
+
+      document.querySelectorAll("#adjSpecTabs button").forEach((btn, j) => {
+        const act = j === adjState.idx;
+        btn.className = "flex-1 py-1.5 rounded border text-[11px] font-bold transition " + (act ? "bg-emerald-600 text-white border-emerald-600" : "bg-white text-slate-600 hover:bg-slate-50");
+      });
+    }
+
+    function adjDraw() {
+      const cur = adjCurrent();
+      if (!cur) return;
+      const {opt, a, spec, conf} = cur;
+      const cv = document.getElementById("adjMainCanvas");
+      const k = Math.min(1, 360 / Math.max(spec.w, spec.h));
+      const W = Math.max(1, Math.round(spec.w * k)), H = Math.max(1, Math.round(spec.h * k));
+      drawCropToCanvas(cv, a.img, W, H, conf.scale, conf.x, conf.y, opt.mode, opt.forceOpaque);
+      cv.style.width = W + "px";
+      cv.style.height = H + "px";
+      document.getElementById("adjOutInfo").textContent = `${spec.os} ${spec.w}×${spec.h}px ／ 元画像 ${a.img.naturalWidth}×${a.img.naturalHeight}px`;
+
+      const group = adjGroupOf(adjState.key);
+      document.getElementById("adjCircleGuide").classList.toggle("hidden", group !== "E");
+
+      // 表示範囲ミニマップ（cover系のみ）
+      const mapBox = document.getElementById("adjMiniMapBox");
+      const isCover = (opt.mode === "cover" || opt.mode === "bottom-cover");
+      mapBox.classList.toggle("hidden", !isCover);
+      if (isCover) {
+        const ia = a.img.naturalWidth / a.img.naturalHeight, ta = spec.w / spec.h, sc = conf.scale / 100;
+        let dw, dh;
+        if (ia > ta) {dh = spec.h * sc; dw = dh * ia;} else {dw = spec.w * sc; dh = dw / ia;}
+        const dx = (spec.w - dw) / 2 + conf.x * (spec.w / 100);
+        const dy = opt.mode === "bottom-cover" ? (spec.h - dh) + conf.y * (spec.h / 100) : (spec.h - dh) / 2 + conf.y * (spec.h / 100);
+        const l = Math.max(0, -dx / dw), r = Math.min(1, (spec.w - dx) / dw);
+        const t = Math.max(0, -dy / dh), b = Math.min(1, (spec.h - dy) / dh);
+
+        const mm = document.getElementById("adjMiniMap");
+        const mw = 180, mh = Math.max(20, Math.round(mw / ia));
+        mm.width = mw; mm.height = mh;
+        mm.style.width = mw + "px"; mm.style.height = mh + "px";
+        const mctx = mm.getContext("2d");
+        mctx.drawImage(a.img, 0, 0, mw, mh);
+        mctx.fillStyle = "rgba(15,23,42,0.55)";
+        mctx.fillRect(0, 0, mw, mh);
+        mctx.drawImage(a.img, l * a.img.naturalWidth, t * a.img.naturalHeight, (r - l) * a.img.naturalWidth, (b - t) * a.img.naturalHeight, l * mw, t * mh, (r - l) * mw, (b - t) * mh);
+        mctx.strokeStyle = "#10b981"; mctx.lineWidth = 2;
+        mctx.strokeRect(l * mw + 1, t * mh + 1, (r - l) * mw - 2, (b - t) * mh - 2);
+        document.getElementById("adjMiniMapInfo").textContent = `横 ${Math.round((r - l) * 100)}% × 縦 ${Math.round((b - t) * 100)}%`;
+      }
+
+      // F: 実機の縦長画面での見え方（実機プレビューと同じ描画条件）
+      const devBox = document.getElementById("adjDevBox");
+      devBox.classList.toggle("hidden", group !== "F");
+      if (group === "F") {
+        const dv = document.getElementById("adjDevCanvas");
+        drawCropToCanvas(dv, a.img, 116, 232, conf.scale, conf.x, conf.y, "bottom-cover", false);
+        dv.style.width = "116px"; dv.style.height = "232px";
+        dv.style.backgroundColor = state.talkBgColor;
+      }
+    }
+
+    function adjBuildTabs() {
+      const cur = adjCurrent();
+      const tabs = document.getElementById("adjSpecTabs");
+      tabs.innerHTML = "";
+      cur.opt.specs.forEach((sp, j) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = `${sp.os} (${sp.w}×${sp.h})`;
+        b.onclick = () => {adjState.idx = j; adjSyncControls(); adjDraw();};
+        tabs.appendChild(b);
+      });
+      const multi = cur.opt.specs.length > 1;
+      document.getElementById("adjLinkRow").classList.toggle("hidden", !multi);
+    }
+
+    function adjLoadTarget(key, idx) {
+      const opt = assetOptRegistry[key];
+      const a = state.assets[key];
+      adjState.key = key;
+      adjState.idx = Math.min(idx || 0, opt.specs.length - 1);
+      if (!Array.isArray(a.specsConfig)) a.specsConfig = [];
+      while (a.specsConfig.length < opt.specs.length) a.specsConfig.push({scale: 100, x: 0, y: 0});
+      adjState.snapshot = JSON.parse(JSON.stringify(a.specsConfig));
+      const c = a.specsConfig;
+      adjState.linked = opt.specs.length > 1 && c.every(v => v.scale === c[0].scale && v.x === c[0].x && v.y === c[0].y);
+      document.getElementById("adjLinkChk").checked = adjState.linked;
+      document.getElementById("adjTargetBadge").textContent = adjTargetLabel(key);
+      document.getElementById("adjSubLabel").textContent = (key === "talk_bg" && state.talkBgNone)
+        ? "※ 現在「背景なし（透過）」が選択中のため、出力・プレビューには使われません（調整値は保持されます）"
+        : "出力サイズどおりの見え方で調整できます";
+      document.getElementById("adjTargetSelect").value = key;
+      adjBuildTabs();
+      adjSyncControls();
+      adjDraw();
+    }
+
+    function openAssetAdjuster(key, idx) {
+      const opt = assetOptRegistry[key];
+      if (!opt || !adjHasImage(key)) {
+        alert("この枠にはまだ画像がありません。\n先に「元画像をアップロード」で画像を登録してから調整してください。");
+        return;
+      }
+      const group = adjGroupOf(key);
+      const sel = document.getElementById("adjTargetSelect");
+      sel.innerHTML = adjTargetKeys(group).map(k => `<option value="${k}">${adjTargetLabel(k)}${adjHasImage(k) ? "" : "（未登録）"}</option>`).join("");
+
+      const modal = document.getElementById("assetAdjustModal");
+      modal.classList.add("active");
+      modal.classList.remove("pointer-events-none");
+      adjLoadTarget(key, idx);
+      adjSetStatus("調整は自動で保存されます", false);
+
+      // 保存完了の表示（既存の自動保存の完了に連動）
+      const st = document.getElementById("saveStatus");
+      if (adjState.observer) adjState.observer.disconnect();
+      adjState.observer = new MutationObserver(() => {
+        if (st.textContent.includes("自動保存済")) {
+          const t = new Date().toLocaleTimeString();
+          adjSetStatus(`✅ 保存しました (${t})`, true);
+        }
+      });
+      adjState.observer.observe(st, {childList: true, characterData: true, subtree: true});
+    }
+
+    async function closeAssetAdjuster() {
+      const modal = document.getElementById("assetAdjustModal");
+      if (!modal.classList.contains("active")) return;
+      if (adjState.observer) {adjState.observer.disconnect(); adjState.observer = null;}
+      clearTimeout(saveTimeout);
+      await saveToDB();
+      modal.classList.remove("active");
+      modal.classList.add("pointer-events-none");
+      adjState.key = null;
+      renderSectionContent(state.currentTab);
+      renderPreview();
+    }
+
+    function adjStep(dir) {
+      const group = adjGroupOf(adjState.key);
+      const keys = adjTargetKeys(group).filter(k => adjHasImage(k) && assetOptRegistry[k]);
+      if (keys.length < 2) return;
+      const i = keys.indexOf(adjState.key);
+      const next = keys[(i + dir + keys.length) % keys.length];
+      adjLoadTarget(next, adjState.idx);
+      adjSetStatus("調整は自動で保存されます", false);
+    }
+
+    function setupAssetAdjuster() {
+      const $ = (id) => document.getElementById(id);
+      $("resetAdjustBtn").onclick = resetAllAdjustments;
+      $("adjScaleRange").oninput = (e) => adjChange({scale: parseFloat(e.target.value)});
+      $("adjXRange").oninput = (e) => adjChange({x: parseFloat(e.target.value)});
+      $("adjYRange").oninput = (e) => adjChange({y: parseFloat(e.target.value)});
+
+      $("adjCenterBtn").onclick = () => {
+        const cur = adjCurrent();
+        if (!cur) return;
+        const lim = adjLimits(cur.opt, cur.spec, cur.a.img, cur.conf.scale);
+        // 上下中央（下揃え基準の背景は、余白の中間を上下中央とする）
+        adjChange({x: 0, y: cur.opt.mode === "bottom-cover" ? (lim.ymax / 2) : 0});
+      };
+      $("adjResetBtn").onclick = () => {
+        // この出力(1つ)だけを初期化。連動ONなら両方。他の画像には影響しない
+        adjChange({scale: 100, x: 0, y: 0});
+      };
+      $("adjRevertBtn").onclick = () => {
+        const cur = adjCurrent();
+        if (!cur || !adjState.snapshot) return;
+        cur.a.specsConfig = JSON.parse(JSON.stringify(adjState.snapshot));
+        adjAfterChange();
+      };
+      $("adjLinkChk").onchange = (e) => {
+        adjState.linked = e.target.checked;
+        if (adjState.linked) {
+          const cur = adjCurrent();
+          if (cur) adjChange({...cur.conf});
+        }
+      };
+      $("adjPrevBtn").onclick = () => adjStep(-1);
+      $("adjNextBtn").onclick = () => adjStep(1);
+      $("adjTargetSelect").onchange = (e) => {
+        const k = e.target.value;
+        if (!adjHasImage(k)) {
+          alert("この画像はまだ登録されていません。先にアップロードしてください。");
+          e.target.value = adjState.key;
+          return;
+        }
+        adjLoadTarget(k, adjState.idx);
+        adjSetStatus("調整は自動で保存されます", false);
+      };
+      $("adjDoneBtn").onclick = closeAssetAdjuster;
+      $("adjCloseBtn").onclick = closeAssetAdjuster;
+      $("assetAdjustModal").addEventListener("mousedown", (e) => {
+        if (e.target === $("assetAdjustModal")) closeAssetAdjuster();
+      });
+
+      // ドラッグで位置調整 / ホイールで拡大縮小
+      const wrap = $("adjCanvasWrap");
+      wrap.addEventListener("pointerdown", (e) => {
+        const cur = adjCurrent();
+        if (!cur) return;
+        wrap.setPointerCapture(e.pointerId);
+        adjState.drag = {sx: e.clientX, sy: e.clientY, x: cur.conf.x, y: cur.conf.y};
+      });
+      wrap.addEventListener("pointermove", (e) => {
+        if (!adjState.drag) return;
+        const cv = $("adjMainCanvas");
+        const rect = cv.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
+        const dxp = (e.clientX - adjState.drag.sx) / rect.width * 100;
+        const dyp = (e.clientY - adjState.drag.sy) / rect.height * 100;
+        adjChange({x: adjState.drag.x + dxp, y: adjState.drag.y + dyp});
+      });
+      const endDrag = () => {adjState.drag = null;};
+      wrap.addEventListener("pointerup", endDrag);
+      wrap.addEventListener("pointercancel", endDrag);
+      wrap.addEventListener("wheel", (e) => {
+        const cur = adjCurrent();
+        if (!cur) return;
+        e.preventDefault();
+        adjChange({scale: cur.conf.scale + (e.deltaY < 0 ? 3 : -3)});
+      }, {passive: false});
+    }
+
     function openMenuButtonStudio(itemId) {
       const modal = document.getElementById("menuStudioModal");
       modal.classList.add("active");
@@ -2405,6 +3100,8 @@
       document.getElementById("mAgYVal").textContent = (ag.yShift || 0) + "px";
       document.getElementById("mAgNeonToggle").checked = !!ag.neonEnabled;
       document.getElementById("mAgNeonPicker").value = ag.neonColor || "#00ffcc";
+      document.getElementById("mAgNeonBlurRange").value = getNeonBlur(ag);
+      document.getElementById("mAgNeonBlurVal").textContent = neonBlurLabel(getNeonBlur(ag));
       document.getElementById("mAgOutlineToggle").checked = !!ag.outlineEnabled;
       document.getElementById("mAgOutlinePicker").value = ag.outlineColor || "#ffffff";
       document.getElementById("mAgPillToggle").checked = !!ag.pillEnabled;
@@ -2449,6 +3146,13 @@
 
       drawSingleMiniPreview(iosCv, charCanvas, 80, 56, ag);
       drawSingleMiniPreview(andCv, charCanvas, 128, 150, ag);
+
+      // ネオンが出力枠で見切れていないかを確認して警告
+      const warn = document.getElementById("mAgNeonClipWarn");
+      if (warn) {
+        const clipped = !!(ag && ag.enabled && ag.neonEnabled && (canvasEdgeHasInk(iosCv) || canvasEdgeHasInk(andCv)));
+        warn.classList.toggle("hidden", !clipped);
+      }
     }
 
     function drawSingleMiniPreview(cv, charImg, targetW, targetH, ag) {
@@ -2482,7 +3186,7 @@
         if (ag.neonEnabled) {
           ctx.save();
           ctx.shadowColor = ag.neonColor || "#00ffcc";
-          ctx.shadowBlur = (ag.neonBlur || 14) * (targetW / 100);
+          ctx.shadowBlur = getNeonBlur(ag) * (targetW / 100);
           ctx.drawImage(charImg, dxEff, dyEff, dwEff, dhEff);
           ctx.restore();
         }
@@ -2647,7 +3351,7 @@
 
       if (!isOffMode && autoGen && autoGen.enabled && autoGen.neonEnabled) {
         ctx.shadowColor = autoGen.neonColor || "#00ffcc";
-        ctx.shadowBlur = (autoGen.neonBlur || 14) * (targetW / 100);
+        ctx.shadowBlur = getNeonBlur(autoGen) * (targetW / 100);
         ctx.drawImage(img, dx, dy, dw, dh);
         ctx.drawImage(img, dx, dy, dw, dh);
       }
@@ -2746,11 +3450,15 @@
       for (let i = 1; i < 4; i++) {
         state.assets[`pass_${i}_off`] = {
           ...p0Off,
+          cropConfig: p0Off.cropConfig ? {...p0Off.cropConfig} : {scale: 100, x: 0, y: 0},
+          autoGen: p0Off.autoGen ? JSON.parse(JSON.stringify(p0Off.autoGen)) : p0Off.autoGen,
           specsConfig: p0Off.specsConfig.map(c => ({...c}))
         };
         if (p0On && p0On.img) {
           state.assets[`pass_${i}_on`] = {
             ...p0On,
+            cropConfig: p0On.cropConfig ? {...p0On.cropConfig} : {scale: 100, x: 0, y: 0},
+            autoGen: p0On.autoGen ? JSON.parse(JSON.stringify(p0On.autoGen)) : p0On.autoGen,
             specsConfig: p0On.specsConfig.map(c => ({...c}))
           };
         }
@@ -2826,19 +3534,18 @@
 
     <div class="mt-2 pt-2 border-t border-slate-200">
       <div class="flex items-center justify-between mb-1">
-        <span class="text-[10px] font-bold text-slate-700">iOS 26 視認性 (ホームOFF/ON)</span>
+        <span id="checkTitle${suffix}" class="text-[10px] font-bold text-slate-700">iOS 26 視認性 (ホームOFF/ON)</span>
         <span class="text-[8px] text-slate-400">ネオン・フチ・同化チェック</span>
       </div>
       <div class="grid grid-cols-2 gap-1">
-        <div class="rounded border bg-white p-1 text-center">
-          <span class="text-[8px] text-slate-400 block">白背景</span>
-          <div id="checkWhite${suffix}" class="h-8 flex items-center justify-center"></div>
-        </div>
-        <div class="rounded bg-slate-900 p-1 text-center">
-          <span class="text-[8px] text-slate-400 block">黒背景 (ネオン強調)</span>
-          <div id="checkBlack${suffix}" class="h-8 flex items-center justify-center"></div>
-        </div>
+        ${[["Off", "OFF"], ["On", "ON"]].map(([st, stLabel]) => [["White", "白背景"], ["Black", "黒背景"]].map(([bg, bgLabel]) => `
+        <div class="rounded border p-1 text-center ${bg === "White" ? "bg-white" : "bg-slate-900 border-slate-900"}">
+          <span class="text-[8px] block ${bg === "White" ? "text-slate-400" : "text-slate-300"}">${stLabel}・${bgLabel}</span>
+          <div id="check${st}${bg}${suffix}" class="h-8 flex items-center justify-center"></div>
+          <span id="check${st}${bg}Info${suffix}" class="text-[8px] block font-semibold ${bg === "White" ? "text-slate-500" : "text-slate-300"}"></span>
+        </div>`).join("")).join("")}
       </div>
+      <p id="checkNote${suffix}" class="text-[8px] text-slate-500 mt-1 leading-snug"></p>
     </div>
   `;
     }
@@ -2925,13 +3632,13 @@
       scr.style.backgroundColor = (view === "talk") ? state.talkBgColor : "#edf8fb";
 
       if (view === "talk") {
-        const talkData = getSpecDataForDevice("talk_bg", SECTIONS.F.items[0].specs, dev);
+        const talkData = state.talkBgNone ? null : getSpecDataForDevice("talk_bg", SECTIONS.F.items[0].specs, dev);
         scr.innerHTML = `
       <canvas id="pvTalkCanvas${suffix}" class="absolute inset-0 w-full h-full object-cover pointer-events-none"></canvas>
       <div class="relative z-10 flex flex-col h-full justify-between">
         <div class="bg-white/90 backdrop-blur px-3 py-2 border-b border-slate-200 flex items-center justify-between text-[11px] font-bold">
           <span>＜ トーク相手</span>
-          <span class="text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">背景: ${state.talkBgColor.toUpperCase()}</span>
+          <span class="text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">背景: ${state.talkBgColor.toUpperCase()}${state.talkBgNone ? "（画像なし）" : ""}</span>
         </div>
         <div class="p-3 space-y-2 flex-1">
           <div class="inline-block bg-white rounded-xl rounded-tl-none px-3 py-1.5 text-[11px] shadow-sm max-w-[80%]">
@@ -3074,22 +3781,96 @@
         });
       }
 
-      const activeIconKey = state.activeButtonKey ? `${state.activeButtonKey}_on` : "B_home_off";
-      let previewIconData = getSpecDataForDevice(activeIconKey, [
-        {targetKey: "ios26", os: "iOS 26", w: 80, h: 56},
-        {targetKey: "legacy", os: "従来/Android", w: 128, h: 150}
-      ], "ios26");
+      renderVisibilityCheck(suffix);
+    }
 
-      const wBox = document.getElementById(`checkWhite${suffix}`);
-      const bBox = document.getElementById(`checkBlack${suffix}`);
-      if (previewIconData) {
-        wBox.innerHTML = `<canvas id="checkWhiteCv${suffix}" class="max-h-7 max-w-9 object-contain"></canvas>`;
-        bBox.innerHTML = `<canvas id="checkBlackCv${suffix}" class="max-h-7 max-w-9 object-contain"></canvas>`;
-        drawCropToCanvas(document.getElementById(`checkWhiteCv${suffix}`), previewIconData.sourceImg, 80, 56, previewIconData.conf.scale, previewIconData.conf.x, previewIconData.conf.y, "bottom-contain", false, previewIconData.asset.autoGen);
-        drawCropToCanvas(document.getElementById(`checkBlackCv${suffix}`), previewIconData.sourceImg, 80, 56, previewIconData.conf.scale, previewIconData.conf.x, previewIconData.conf.y, "bottom-contain", false, previewIconData.asset.autoGen);
-      } else {
-        wBox.innerHTML = `<span class="text-[8px] text-slate-400">未登録</span>`;
-        bBox.innerHTML = `<span class="text-[8px] text-slate-400">未登録</span>`;
+    // =========================================================================
+    // iOS 26 視認性チェック: 現在選択中ボタンの OFF / ON を、白背景・黒背景で実寸(80×56)描画し、
+    // 背景と同化している部分の割合を実際のピクセルから測定する
+    // =========================================================================
+    const VIS_CHECK_SPECS = [
+      {targetKey: "ios26", os: "iOS 26", w: 80, h: 56},
+      {targetKey: "legacy", os: "従来/Android", w: 128, h: 150}
+    ];
+    const VIS_BLEND_CONTRAST = 3;      // 背景とのコントラスト比がこれ未満の画素を「同化」とみなす（WCAG 非テキスト 3:1）
+    const VIS_BLEND_WARN_RATIO = 0.5;  // 同化画素が表示部分の半分以上なら注意表示
+
+    function visLuminance(r, g, b) {
+      const f = (v) => {v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);};
+      return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+    }
+
+    // canvas に描かれた絵（alpha>=128 の画素）のうち、背景色とのコントラスト比が基準未満の割合
+    function measureBlendRatio(cv, bgLum) {
+      const d = cv.getContext("2d").getImageData(0, 0, cv.width, cv.height).data;
+      let total = 0, blend = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] < 128) continue;
+        total++;
+        const l = visLuminance(d[i], d[i + 1], d[i + 2]);
+        const ratio = (Math.max(l, bgLum) + 0.05) / (Math.min(l, bgLum) + 0.05);
+        if (ratio < VIS_BLEND_CONTRAST) blend++;
+      }
+      return total ? {total, ratio: blend / total} : null;
+    }
+
+    function renderVisibilityCheck(suffix) {
+      const meta = SECTIONS.B.items.find(it => it.id === state.activeButtonKey) || SECTIONS.B.items[0];
+      const shortName = meta.label.replace(/\s*\(.*\)\s*$/, "");
+      const title = document.getElementById(`checkTitle${suffix}`);
+      if (title) title.textContent = `iOS 26 視認性 (${shortName} OFF/ON)`;
+
+      const offData = getSpecDataForDevice(`${meta.id}_off`, VIS_CHECK_SPECS, "ios26");
+      const onData = getSpecDataForDevice(`${meta.id}_on`, VIS_CHECK_SPECS, "ios26");
+      const onAsset = state.assets[`${meta.id}_on`];
+      const ag = onAsset && onAsset.autoGen;
+
+      const draw = (st, data, drawFn) => {
+        [["White", 1], ["Black", 0]].forEach(([bg, bgLum]) => {
+          const box = document.getElementById(`check${st}${bg}${suffix}`);
+          const info = document.getElementById(`check${st}${bg}Info${suffix}`);
+          if (!box) return;
+          if (!data) {
+            box.innerHTML = `<span class="text-[8px] text-slate-400">未登録</span>`;
+            if (info) info.textContent = "-";
+            return;
+          }
+          box.innerHTML = `<canvas class="max-h-7 max-w-9 object-contain"></canvas>`;
+          const cv = box.querySelector("canvas");
+          drawFn(cv);
+          const m = measureBlendRatio(cv, bgLum);
+          if (info) {
+            if (!m) {
+              info.textContent = "-";
+            } else {
+              const pct = Math.round(m.ratio * 100);
+              const warn = m.ratio >= VIS_BLEND_WARN_RATIO;
+              info.textContent = `${warn ? "⚠ " : ""}同化 ${pct}%`;
+              info.style.color = warn ? "#f59e0b" : "";
+            }
+          }
+        });
+      };
+
+      // OFF: 書き出し(ZIP)と同じく、ONペアのエフェクト設定を参照して描画
+      draw("Off", offData, (cv) => drawCropToCanvas(cv, offData.sourceImg, 80, 56, offData.conf.scale, offData.conf.x, offData.conf.y, "bottom-contain", false, ag, true));
+      // ON: ネオン・フチ・シャドウ等を含めた実際の見た目
+      draw("On", onData, (cv) => drawCropToCanvas(cv, onData.sourceImg, 80, 56, onData.conf.scale, onData.conf.x, onData.conf.y, "bottom-contain", false, onData.asset.autoGen));
+
+      const note = document.getElementById(`checkNote${suffix}`);
+      if (note) {
+        if (!offData && !onData) {
+          note.textContent = "このボタンの画像が未登録です。Bタブで画像をアップロードするとここに表示されます。";
+        } else {
+          const on = (v) => v ? "ON" : "OFF";
+          const eff = (ag && ag.enabled)
+            ? `ON加工: ネオン${on(ag.neonEnabled)} / フチ${on(ag.outlineEnabled)} / シャドウ${on(ag.shadowEnabled)} / ピル${on(ag.pillEnabled)}`
+            : "ON加工: なし";
+          let clipMsg = "";
+          const onCv = document.querySelector(`#checkOnWhite${suffix} canvas`);
+          if (ag && ag.enabled && ag.neonEnabled && onCv && canvasEdgeHasInk(onCv)) clipMsg = "　⚠ ネオンが枠で見切れています";
+          note.textContent = `${eff}${clipMsg}　※「同化」＝背景とのコントラスト比が${VIS_BLEND_CONTRAST}:1未満の絵の割合（目安）`;
+        }
       }
     }
 
@@ -3489,9 +4270,394 @@
     }
 
     // =========================================================================
+    // ★ ZIP出力用 PNG 容量最適化
+    //   PNG形式・透過・ファイル名・画像サイズは維持し、ZIPに入れるコピーだけを最適化する。
+    //   手順: ①可逆の再圧縮(フィルタ最適化) → ②色数が少なければ可逆パレット化 →
+    //         ③色数を段階的に減らしたパレットPNG(256→32色)。解像度は一切変更しない。
+    // =========================================================================
+    const PNG_LIMIT_BYTES = 1000000;   // LINEの上限は1MB。余裕を見て 1,000,000 バイト以下を目標にする
+
+    function createTransparentPngBlob(w, h) {
+      return new Promise(res => {
+        const c = document.createElement("canvas");
+        c.width = w; c.height = h;
+        c.toBlob(b => res(b), "image/png");
+      });
+    }
+
+    const PNG_CRC_TABLE = (() => {
+      const t = new Uint32Array(256);
+      for (let n = 0; n < 256; n++) {
+        let c = n;
+        for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+        t[n] = c >>> 0;
+      }
+      return t;
+    })();
+
+    function pngCrc32(buf) {
+      let c = 0xFFFFFFFF;
+      for (let i = 0; i < buf.length; i++) c = PNG_CRC_TABLE[(c ^ buf[i]) & 0xFF] ^ (c >>> 8);
+      return (c ^ 0xFFFFFFFF) >>> 0;
+    }
+
+    function pngChunk(type, data) {
+      const out = new Uint8Array(12 + data.length);
+      const dv = new DataView(out.buffer);
+      dv.setUint32(0, data.length);
+      for (let i = 0; i < 4; i++) out[4 + i] = type.charCodeAt(i);
+      out.set(data, 8);
+      dv.setUint32(8 + data.length, pngCrc32(out.subarray(4, 8 + data.length)));
+      return out;
+    }
+
+    async function zlibDeflate(u8) {
+      if (typeof CompressionStream === "undefined") throw new Error("このブラウザはPNGの再圧縮に対応していません");
+      const cs = new CompressionStream("deflate");   // zlib形式（PNGのIDATと同じ形式）
+      const writer = cs.writable.getWriter();
+      writer.write(u8);
+      writer.close();
+      return new Uint8Array(await new Response(cs.readable).arrayBuffer());
+    }
+
+    // PNGフィルタ（行ごとに最も圧縮しやすいものを選択）
+    function pngFilterImage(px, w, h, bpp) {
+      const rb = w * bpp;
+      const out = new Uint8Array(h * (rb + 1));
+      const cand = [0, 1, 2, 3, 4].map(() => new Uint8Array(rb));
+      for (let y = 0; y < h; y++) {
+        const row = y * rb, prev = row - rb;
+        const hasPrev = y > 0;
+        const sums = [0, 0, 0, 0, 0];
+        for (let i = 0; i < rb; i++) {
+          const x = px[row + i];
+          const a = i >= bpp ? px[row + i - bpp] : 0;
+          const b = hasPrev ? px[prev + i] : 0;
+          const c = (hasPrev && i >= bpp) ? px[prev + i - bpp] : 0;
+          const p = a + b - c;
+          const pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c);
+          const pr = (pa <= pb && pa <= pc) ? a : (pb <= pc ? b : c);
+          const v0 = x, v1 = (x - a) & 255, v2 = (x - b) & 255, v3 = (x - ((a + b) >> 1)) & 255, v4 = (x - pr) & 255;
+          cand[0][i] = v0; cand[1][i] = v1; cand[2][i] = v2; cand[3][i] = v3; cand[4][i] = v4;
+          sums[0] += v0 < 128 ? v0 : 256 - v0;
+          sums[1] += v1 < 128 ? v1 : 256 - v1;
+          sums[2] += v2 < 128 ? v2 : 256 - v2;
+          sums[3] += v3 < 128 ? v3 : 256 - v3;
+          sums[4] += v4 < 128 ? v4 : 256 - v4;
+        }
+        let best = 0;
+        for (let f = 1; f < 5; f++) if (sums[f] < sums[best]) best = f;
+        out[y * (rb + 1)] = best;
+        out.set(cand[best], y * (rb + 1) + 1);
+      }
+      return out;
+    }
+
+    async function encodePngBytes(w, h, pixels, bpp, colorType, palette) {
+      const z = await zlibDeflate(pngFilterImage(pixels, w, h, bpp));
+      const ihdr = new Uint8Array(13);
+      const dv = new DataView(ihdr.buffer);
+      dv.setUint32(0, w); dv.setUint32(4, h);
+      ihdr[8] = 8; ihdr[9] = colorType; ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;
+      const parts = [new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]), pngChunk("IHDR", ihdr)];
+      if (palette) {
+        const plte = new Uint8Array(palette.length * 3);
+        palette.forEach((c, i) => {plte[i * 3] = c[0]; plte[i * 3 + 1] = c[1]; plte[i * 3 + 2] = c[2];});
+        parts.push(pngChunk("PLTE", plte));
+        let last = -1;
+        palette.forEach((c, i) => {if (c[3] < 255) last = i;});
+        if (last >= 0) parts.push(pngChunk("tRNS", Uint8Array.from(palette.slice(0, last + 1).map(c => c[3]))));
+      }
+      parts.push(pngChunk("IDAT", z), pngChunk("IEND", new Uint8Array(0)));
+      const total = parts.reduce((n, p) => n + p.length, 0);
+      const out = new Uint8Array(total);
+      let o = 0;
+      parts.forEach(p => {out.set(p, o); o += p.length;});
+      return out;
+    }
+
+    async function decodePngToRgba(u8) {
+      const url = URL.createObjectURL(new Blob([u8], {type: "image/png"}));
+      const img = new Image();
+      await new Promise((res, rej) => {img.onload = res; img.onerror = () => rej(new Error("PNGを読み込めません")); img.src = url;});
+      URL.revokeObjectURL(url);
+      const c = document.createElement("canvas");
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      const ctx = c.getContext("2d", {willReadFrequently: true});
+      ctx.drawImage(img, 0, 0);
+      return {w: c.width, h: c.height, data: ctx.getImageData(0, 0, c.width, c.height).data};
+    }
+
+    // ① 可逆: 不透明ならRGB、透過があればRGBAで、フィルタ最適化して再エンコード
+    async function encodeTruecolorLossless(dec) {
+      const n = dec.w * dec.h, d = dec.data;
+      let opaque = true;
+      for (let i = 3; i < d.length; i += 4) if (d[i] !== 255) {opaque = false; break;}
+      if (opaque) {
+        const rgb = new Uint8Array(n * 3);
+        for (let i = 0, o = 0; i < n; i++, o += 3) {rgb[o] = d[i * 4]; rgb[o + 1] = d[i * 4 + 1]; rgb[o + 2] = d[i * 4 + 2];}
+        return encodePngBytes(dec.w, dec.h, rgb, 3, 2, null);
+      }
+      const rgba = new Uint8Array(d.length);
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] === 0) continue;   // 完全透明のRGBは0に統一（圧縮しやすくする・見た目は同じ）
+        rgba[i] = d[i]; rgba[i + 1] = d[i + 1]; rgba[i + 2] = d[i + 2]; rgba[i + 3] = d[i + 3];
+      }
+      return encodePngBytes(dec.w, dec.h, rgba, 4, 6, null);
+    }
+
+    // ② 可逆: 色数が256以下ならそのままパレット化
+    async function encodePaletteExact(dec) {
+      const n = dec.w * dec.h, d = dec.data;
+      const map = new Map(), palette = [];
+      const idx = new Uint8Array(n);
+      for (let i = 0; i < n; i++) {
+        const o = i * 4, a = d[o + 3];
+        const key = a === 0 ? 0 : (((d[o] * 16777216) + (d[o + 1] << 16) + (d[o + 2] << 8) + a) >>> 0) + 1;
+        let j = map.get(key);
+        if (j === undefined) {
+          if (palette.length >= 256) return null;
+          j = palette.length;
+          map.set(key, j);
+          palette.push(a === 0 ? [0, 0, 0, 0] : [d[o], d[o + 1], d[o + 2], a]);
+        }
+        idx[i] = j;
+      }
+      return encodePngBytes(dec.w, dec.h, idx, 1, 3, palette);
+    }
+
+    // ③ 減色: メディアンカットでパレットを作り、(必要なら誤差拡散で)割り当てる
+    function buildQuantPalette(data, n, maxColors) {
+      const SIZE = 131072;
+      const cnt = new Uint32Array(SIZE), sr = new Uint32Array(SIZE), sg = new Uint32Array(SIZE), sb = new Uint32Array(SIZE), sa = new Uint32Array(SIZE);
+      let hasTrans = false;
+      for (let i = 0; i < n; i++) {
+        const o = i * 4, a = data[o + 3];
+        if (a < 8) {hasTrans = true; continue;}
+        const k = ((data[o] >> 3) << 12) | ((data[o + 1] >> 3) << 7) | ((data[o + 2] >> 3) << 2) | (a >> 6);
+        cnt[k]++; sr[k] += data[o]; sg[k] += data[o + 1]; sb[k] += data[o + 2]; sa[k] += a;
+      }
+      const entries = [];
+      for (let k = 0; k < SIZE; k++) {
+        if (cnt[k]) entries.push({n: cnt[k], v: [sr[k] / cnt[k], sg[k] / cnt[k], sb[k] / cnt[k], sa[k] / cnt[k]]});
+      }
+      const W = [1.0, 1.2, 0.8, 1.0];
+      const stat = (es) => {
+        const mn = [255, 255, 255, 255], mx = [0, 0, 0, 0];
+        let tot = 0;
+        for (const e of es) {
+          tot += e.n;
+          for (let c = 0; c < 4; c++) {if (e.v[c] < mn[c]) mn[c] = e.v[c]; if (e.v[c] > mx[c]) mx[c] = e.v[c];}
+        }
+        let axis = 0, rng = -1;
+        for (let c = 0; c < 4; c++) {const r = (mx[c] - mn[c]) * W[c]; if (r > rng) {rng = r; axis = c;}}
+        return {tot, axis, rng, score: rng * Math.sqrt(tot)};
+      };
+      const target = Math.max(1, maxColors - (hasTrans ? 1 : 0));
+      let boxes = entries.length ? [{es: entries, st: stat(entries)}] : [];
+      while (boxes.length < target) {
+        let bi = -1, bs = -1;
+        boxes.forEach((b, i) => {if (b.es.length > 1 && b.st.rng > 0 && b.st.score > bs) {bs = b.st.score; bi = i;}});
+        if (bi < 0) break;
+        const b = boxes[bi], ax = b.st.axis;
+        b.es.sort((p, q) => p.v[ax] - q.v[ax]);
+        let acc = 0, cut = 1;
+        for (let i = 0; i < b.es.length - 1; i++) {acc += b.es[i].n; cut = i + 1; if (acc >= b.st.tot / 2) break;}
+        const e1 = b.es.slice(0, cut), e2 = b.es.slice(cut);
+        boxes.splice(bi, 1, {es: e1, st: stat(e1)}, {es: e2, st: stat(e2)});
+      }
+      const palette = boxes.map(b => {
+        const v = [0, 0, 0, 0]; let t = 0;
+        for (const e of b.es) {t += e.n; for (let c = 0; c < 4; c++) v[c] += e.v[c] * e.n;}
+        return v.map(x => Math.round(x / t));
+      });
+      if (hasTrans) palette.unshift([0, 0, 0, 0]);
+      return {palette, hasTrans};
+    }
+
+    function mapToPalette(data, w, h, palette, hasTrans, dither) {
+      const idx = new Uint8Array(w * h);
+      const cache = new Int16Array(131072).fill(-1);
+      const start = hasTrans ? 1 : 0, P = palette.length;
+      const nearest = (r, g, b, a) => {
+        let best = start, bd = Infinity;
+        for (let j = start; j < P; j++) {
+          const p = palette[j];
+          const dr = r - p[0], dg = g - p[1], db = b - p[2], da = a - p[3];
+          const d = dr * dr * 0.9 + dg * dg * 1.2 + db * db * 0.7 + da * da * 0.8;
+          if (d < bd) {bd = d; best = j;}
+        }
+        return best;
+      };
+      let cur = new Float32Array((w + 2) * 3), nxt = new Float32Array((w + 2) * 3);
+      for (let y = 0; y < h; y++) {
+        nxt.fill(0);
+        for (let x = 0; x < w; x++) {
+          const o = (y * w + x) * 4, a = data[o + 3];
+          if (a < 8) {idx[y * w + x] = 0; continue;}
+          let r = data[o], g = data[o + 1], b = data[o + 2];
+          if (dither) {
+            r += cur[(x + 1) * 3]; g += cur[(x + 1) * 3 + 1]; b += cur[(x + 1) * 3 + 2];
+          }
+          r = r < 0 ? 0 : (r > 255 ? 255 : r); g = g < 0 ? 0 : (g > 255 ? 255 : g); b = b < 0 ? 0 : (b > 255 ? 255 : b);
+          const ri = r | 0, gi = g | 0, bi = b | 0;
+          const ab = a >> 6;
+          const key = ((ri >> 3) << 12) | ((gi >> 3) << 7) | ((bi >> 3) << 2) | ab;
+          let j = cache[key];
+          if (j < 0) {
+            j = nearest((ri & ~7) + 4, (gi & ~7) + 4, (bi & ~7) + 4, ab === 3 ? 255 : ab * 64 + 32);
+            cache[key] = j;
+          }
+          idx[y * w + x] = j;
+          if (dither) {
+            const p = palette[j];
+            const er = r - p[0], eg = g - p[1], eb = b - p[2];
+            const i1 = (x + 2) * 3, i2 = x * 3, i3 = (x + 1) * 3;
+            cur[i1] += er * 7 / 16; cur[i1 + 1] += eg * 7 / 16; cur[i1 + 2] += eb * 7 / 16;
+            nxt[i2] += er * 3 / 16; nxt[i2 + 1] += eg * 3 / 16; nxt[i2 + 2] += eb * 3 / 16;
+            nxt[i3] += er * 5 / 16; nxt[i3 + 1] += eg * 5 / 16; nxt[i3 + 2] += eb * 5 / 16;
+            nxt[i1] += er / 16; nxt[i1 + 1] += eg / 16; nxt[i1 + 2] += eb / 16;
+          }
+        }
+        const t = cur; cur = nxt; nxt = t;
+      }
+      return idx;
+    }
+
+    const PNG_QUANT_LADDER = [[256, true], [256, false], [192, false], [128, false], [96, false], [64, false], [48, false], [32, false]];
+
+    // 戻り値: {bytes, method, ok}  ok = 上限以下になったか。元より小さくならなければ元データを返す
+    async function optimizePngBytes(u8, limit) {
+      const dec = await decodePngToRgba(u8);
+      let best = {bytes: u8, method: "最適化なし"};
+      const consider = (bytes, method) => {if (bytes && bytes.length < best.bytes.length) best = {bytes, method};};
+      const yieldUI = () => new Promise(r => setTimeout(r, 0));
+
+      consider(await encodeTruecolorLossless(dec), "可逆再圧縮");
+      if (best.bytes.length <= limit) return {...best, ok: true};
+      await yieldUI();
+
+      consider(await encodePaletteExact(dec), "可逆パレット化");
+      if (best.bytes.length <= limit) return {...best, ok: true};
+
+      const n = dec.w * dec.h;
+      for (const [colors, dither] of PNG_QUANT_LADDER) {
+        await yieldUI();
+        const {palette, hasTrans} = buildQuantPalette(dec.data, n, colors);
+        const idx = mapToPalette(dec.data, dec.w, dec.h, palette, hasTrans, dither);
+        const bytes = await encodePngBytes(dec.w, dec.h, idx, 1, 3, palette);
+        consider(bytes, `${colors}色パレット${dither ? "(誤差拡散)" : ""}`);
+        if (best.bytes.length <= limit) return {...best, ok: true};
+      }
+      return {...best, ok: best.bytes.length <= limit};
+    }
+
+    function fmtBytes(n) {
+      return n >= 1048576 ? (n / 1048576).toFixed(2) + "MB" : (n / 1024).toFixed(0) + "KB";
+    }
+
+    // ZIP内の全PNGを確認し、上限を超えるものだけ最適化（ZIPに入れるコピーのみ。元の編集データは変更しない）
+    async function optimizeZipPngs(zip, onProgress) {
+      const optimized = [], remaining = [];
+      const names = Object.keys(zip.files).filter(n => /\.png$/i.test(n));
+      for (const name of names) {
+        const u8 = await zip.file(name).async("uint8array");
+        if (u8.length <= PNG_LIMIT_BYTES) continue;
+        if (onProgress) onProgress(name);
+        try {
+          const res = await optimizePngBytes(u8, PNG_LIMIT_BYTES);
+          if (res.bytes.length < u8.length) zip.file(name, res.bytes);
+          const rec = {name, before: u8.length, after: Math.min(u8.length, res.bytes.length), method: res.method};
+          (res.ok ? optimized : remaining).push(rec);
+        } catch (err) {
+          console.warn("PNG最適化に失敗:", name, err);
+          remaining.push({name, before: u8.length, after: u8.length, method: "最適化に失敗: " + err.message});
+        }
+      }
+      return {optimized, remaining, checked: names.length};
+    }
+
+    // =========================================================================
+    // ★ 調整リセット: 画像素材は残したまま、配置・拡大縮小・トリミング・各種調整だけを初期状態へ
+    // =========================================================================
+    function resetBOffAsset(off) {
+      return new Promise(res => {
+        const raw = off.rawSourceImg || off.img;
+        off.maskDataUrl = null;
+        off.specsConfig = [{scale: 100, x: 0, y: 0}, {scale: 100, x: 0, y: 0}];
+        off.cropConfig = {scale: 100, x: 0, y: 0};
+        if (!raw) {res(); return;}
+        off.rawSourceImg = raw;
+        // アップロード直後と同じ初期状態（配置のみ自動調整・拡大率は100%）に戻す
+        applyBAutoPlacement(off, raw, (ok) => {
+          if (!ok) {off.img = raw; off.cropConfig = {scale: 100, x: 0, y: 0};}
+          res();
+        });
+      });
+    }
+
+    async function resetAllAdjustments() {
+      if (!confirm("画像素材は残したまま、配置・拡大縮小・トリミング・各種調整を初期状態に戻します。よろしいですか？\n\n"
+        + "・B: 拡大縮小・X/Y・消しゴム・ONエフェクト(ネオン範囲など)・親子継承\n"
+        + "・D / E / F: 拡大縮小・X/Y・トリミング位置\n"
+        + "※ アップロードした画像は削除されません。")) return;
+
+      // A / C / D / E / F: 出力ごとの調整値(specsConfig)だけを初期化（画像は残す）
+      for (const [key, a] of Object.entries(state.assets)) {
+        if (key.startsWith("B_")) continue;
+        if (Array.isArray(a.specsConfig)) a.specsConfig = a.specsConfig.map(() => ({scale: 100, x: 0, y: 0}));
+        a.cropConfig = {scale: 100, x: 0, y: 0};
+      }
+
+      // B: OFF画像の配置・マスク、ONの効果を初期化
+      for (const item of SECTIONS.B.items) {
+        const off = state.assets[`${item.id}_off`];
+        const on = state.assets[`${item.id}_on`];
+        if (off) await resetBOffAsset(off);
+        if (on) {
+          on.autoGen = defaultAutoGen();
+          on.maskDataUrl = null;
+          on.specsConfig = [{scale: 100, x: 0, y: 0}, {scale: 100, x: 0, y: 0}];
+          if (off && !on.customUploaded) {
+            on.img = off.img;
+            on.rawSourceImg = off.rawSourceImg || off.img;
+            on.cropConfig = off.cropConfig ? {...off.cropConfig} : {scale: 100, x: 0, y: 0};
+          } else {
+            on.cropConfig = {scale: 100, x: 0, y: 0};
+          }
+        }
+      }
+
+      // B親子継承を初期状態へ（3→4, 6→5・7, 8→9 を継承中に）。
+      // 子が自分で素材をアップロード／コピーしている場合は、素材を守るため独立のまま残す
+      const keptIndependent = [];
+      const nextCustom = {};
+      SECTIONS.B.items.forEach(it => {
+        if (!it.inheritFrom) return;
+        if (state.menuOwn[it.id] && menuParentHasImage(it.id)) {
+          nextCustom[it.id] = true;
+          keptIndependent.push(it.label.replace(/\s*\(.*\)\s*$/, ""));
+        }
+      });
+      state.menuCustom = nextCustom;
+      state.menuSynced = {};
+      await syncMenuInheritance();
+
+      renderSectionContent(state.currentTab);
+      renderPreview();
+      triggerAutoSave();
+      alert("調整を初期状態に戻しました（画像素材はそのまま残っています）。"
+        + (keptIndependent.length ? `\n\n自分で画像を登録した ${keptIndependent.join("、")} は、素材を守るため独立のままです。` : ""));
+    }
+
+    // =========================================================================
     // 9. ZIP一括出力 ＆ リセット
     // =========================================================================
     document.getElementById("exportZipBtn").onclick = async () => {
+      if (typeof JSZip === "undefined" || typeof saveAs === "undefined") {
+        alert("ZIP出力用のライブラリを読み込めませんでした。インターネットに接続した状態でページを再読み込みしてください。");
+        return;
+      }
       const zip = new JSZip();
       let fileCount = 0;
 
@@ -3555,17 +4721,24 @@
       }
       const eg = state.assets["profile_group"];
       if (eg && eg.img) {
-        zip.file("i_21.png", await createCroppedBlob(eg, ep.specsConfig[0] || {scale: 100, x: 0, y: 0}, 240, 240, "cover", false));
-        zip.file("a_21.png", await createCroppedBlob(eg, ep.specsConfig[1] || {scale: 100, x: 0, y: 0}, 247, 247, "cover", false));
+        zip.file("i_21.png", await createCroppedBlob(eg, eg.specsConfig[0] || {scale: 100, x: 0, y: 0}, 240, 240, "cover", false));
+        zip.file("a_21.png", await createCroppedBlob(eg, eg.specsConfig[1] || {scale: 100, x: 0, y: 0}, 247, 247, "cover", false));
         fileCount += 2;
       }
 
-      // F: トーク背景
-      const f = state.assets["talk_bg"];
-      if (f && f.img) {
-        zip.file("i_22.png", await createCroppedBlob(f, f.specsConfig[0] || {scale: 100, x: 0, y: 0}, 1482, 1334, "bottom-cover", false));
-        zip.file("a_22.png", await createCroppedBlob(f, f.specsConfig[1] || {scale: 100, x: 0, y: 0}, 1300, 1300, "bottom-cover", false));
+      // F: トーク背景（背景なし選択時は、同名・同サイズの完全透過PNGを出力）
+      const fSpecs = SECTIONS.F.items[0].specs;
+      if (state.talkBgNone) {
+        zip.file("i_22.png", await createTransparentPngBlob(fSpecs[0].w, fSpecs[0].h));
+        zip.file("a_22.png", await createTransparentPngBlob(fSpecs[1].w, fSpecs[1].h));
         fileCount += 2;
+      } else {
+        const f = state.assets["talk_bg"];
+        if (f && f.img) {
+          zip.file("i_22.png", await createCroppedBlob(f, f.specsConfig[0] || {scale: 100, x: 0, y: 0}, 1482, 1334, "bottom-cover", false));
+          zip.file("a_22.png", await createCroppedBlob(f, f.specsConfig[1] || {scale: 100, x: 0, y: 0}, 1300, 1300, "bottom-cover", false));
+          fileCount += 2;
+        }
       }
 
       if (fileCount === 0) {
@@ -3573,8 +4746,33 @@
         return;
       }
 
-      const content = await zip.generateAsync({type: "blob"});
-      saveAs(content, "line_theme_assets.zip");
+      // ZIP内の全PNGの容量を確認し、1MBを超えるものだけ自動最適化（PNG形式・サイズ・ファイル名は維持）
+      const exportBtn = document.getElementById("exportZipBtn");
+      const exportLabel = exportBtn.querySelector("span");
+      const labelBackup = exportLabel.textContent;
+      let pngReport = {optimized: [], remaining: [], checked: 0};
+      exportBtn.disabled = true;
+      try {
+        pngReport = await optimizeZipPngs(zip, (name) => {exportLabel.textContent = `📦 PNG最適化中… ${name}`;});
+        exportLabel.textContent = "📦 ZIP作成中…";
+        const content = await zip.generateAsync({type: "blob"});
+        saveAs(content, "line_theme_assets.zip");
+      } finally {
+        exportBtn.disabled = false;
+        exportLabel.textContent = labelBackup;
+      }
+
+      const lines = [];
+      if (pngReport.optimized.length) {
+        lines.push(`✅ 1MBを超えていたPNGを自動で最適化しました（形式・サイズ・ファイル名はそのまま）`);
+        pngReport.optimized.forEach(r => lines.push(`・${r.name}: ${fmtBytes(r.before)} → ${fmtBytes(r.after)}（${r.method}）`));
+      }
+      if (pngReport.remaining.length) {
+        lines.push(`${lines.length ? "\n" : ""}⚠️ 最適化後も1MBを超えているファイルがあります`);
+        pngReport.remaining.forEach(r => lines.push(`・${r.name}: ${fmtBytes(r.before)} → ${fmtBytes(r.after)}（${r.method}）`));
+        lines.push("※ 画像サイズは規格のため変更していません。色数やディテールの少ない画像に差し替えると小さくできます。");
+      }
+      if (lines.length) alert(lines.join("\n"));
     };
 
     // リセット処理
@@ -3586,6 +4784,8 @@
         state.menuSynced = {};
         studioState.sourceImg = null;
         state.talkBgColor = "#edf8fb";
+        state.talkBgNone = false;
+        state.menuOwn = {};
         renderSectionContent(state.currentTab);
         renderPreview();
         document.getElementById("saveStatus").textContent = "☁️ リセット完了";
