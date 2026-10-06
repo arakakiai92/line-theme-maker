@@ -666,6 +666,7 @@
         currentDevice: state.currentDevice,
         talkBgColor: state.talkBgColor,
         studioSourceDataUrl: studioState.sourceImg ? studioState.sourceImg.src : null,
+        menuInheritCustom: state.menuCustom,
         assets: cleanAssets
       });
 
@@ -731,6 +732,21 @@
               };
             }
           }
+          // 過去の不具合で ON の参照先(autoGenFrom)が別ボタンのOFFを指していた保存データを補正
+          SECTIONS.B.items.forEach(it => {
+            const on = state.assets[`${it.id}_on`];
+            if (on && on.autoGenFrom && on.autoGenFrom !== `${it.id}_off`) on.autoGenFrom = `${it.id}_off`;
+          });
+
+          // 子ボタンの「個別編集済み」状態を復元。旧データ(項目なし)は既存の中身を守るため個別編集済み扱いにする
+          if (data.menuInheritCustom && typeof data.menuInheritCustom === "object") {
+            state.menuCustom = {...data.menuInheritCustom};
+          } else {
+            state.menuCustom = {};
+            SECTIONS.B.items.forEach(it => {
+              if (it.inheritFrom && menuButtonHasContent(it.id)) state.menuCustom[it.id] = true;
+            });
+          }
           resolve(true);
         };
         req.onerror = () => resolve(false);
@@ -747,6 +763,7 @@
     function triggerAutoSave() {
       clearTimeout(saveTimeout);
       saveTimeout = setTimeout(saveToDB, 600);
+      setTimeout(() => {syncMenuInheritance();}, 0);   // 親の変更を未編集の子へ継承
     }
 
     // =========================================================================
@@ -779,10 +796,10 @@
           {id: "B_voom", label: "3. VOOM (基本)", isCore: true, offKey: "i_33", onKey: "i_34"},
           {id: "B_news", label: "6. ニュース (基本)", isCore: true, offKey: "i_25", onKey: "i_26"},
           {id: "B_wallet", label: "8. ウォレット (基本)", isCore: true, offKey: "i_27", onKey: "i_28"},
-          {id: "B_shopping", label: "4. ショッピング (追加)", isCore: false, offKey: "i_35", onKey: "i_36"},
-          {id: "B_call", label: "5. 通話 (追加)", isCore: false, offKey: "i_07", onKey: "i_08"},
-          {id: "B_today", label: "7. TODAY (追加)", isCore: false, offKey: "i_31", onKey: "i_32"},
-          {id: "B_app", label: "9. アプリ (追加)", isCore: false, offKey: "i_37", onKey: "i_38"}
+          {id: "B_shopping", label: "4. ショッピング (追加)", isCore: false, inheritFrom: "B_voom", offKey: "i_35", onKey: "i_36"},
+          {id: "B_call", label: "5. 通話 (追加)", isCore: false, inheritFrom: "B_news", offKey: "i_07", onKey: "i_08"},
+          {id: "B_today", label: "7. TODAY (追加)", isCore: false, inheritFrom: "B_news", offKey: "i_31", onKey: "i_32"},
+          {id: "B_app", label: "9. アプリ (追加)", isCore: false, inheritFrom: "B_wallet", offKey: "i_37", onKey: "i_38"}
         ]
       },
       C: {
@@ -853,8 +870,11 @@
       activeButtonKey: "B_home",
       showBadgeGuide: false,
       talkBgColor: "#edf8fb",
-      assets: {}
+      assets: {},
+      menuCustom: {},   // 子ボタンIDごとの「個別編集済み」フラグ（保存対象）
+      menuSynced: {}    // 子ボタンIDごとの「最後に継承した親の状態シグネチャ」（メモリのみ）
     };
+    let appUiReady = false;
 
     // =========================================================================
     // 3. アプリ初期化＆タブ構築
@@ -862,6 +882,7 @@
     async function init() {
       await initDB();
       const restored = await loadFromDB();
+      await syncMenuInheritance();   // 親に設定があれば、空/未編集の子を初期表示で埋める
 
       buildTabs();
       bindDeviceViewButtons();
@@ -877,6 +898,7 @@
       }
 
       renderPreview();
+      appUiReady = true;
     }
 
     function buildTabs() {
@@ -946,6 +968,7 @@
             const off = state.assets[`${item.id}_off`];
             if (off && (off.img || off.rawSourceImg)) {
               applyAutoGenToItem(item.id, targetConfig);
+              markMenuCustom(item.id);   // 明示的な一括適用なので、子は個別扱い（親の変更で上書きしない）
               count++;
             }
           });
@@ -1438,6 +1461,7 @@
           data.rawSourceImg = null;
           data.customUploaded = false;
           data.filename = "";
+          if (opt.parentItemKey) markMenuCustom(opt.parentItemKey);
           renderSectionContent(state.currentTab);
           renderPreview();
           triggerAutoSave();
@@ -1450,6 +1474,7 @@
         reader.onload = (e) => {
           const img = new Image();
           img.onload = () => {
+            if (opt.parentItemKey) markMenuCustom(opt.parentItemKey);   // 子に直接アップロード = 個別編集
             data.rawSourceImg = img;
             data.img = img;
             data.cropConfig = {scale: 100, x: 0, y: 0};
@@ -1869,6 +1894,7 @@
         if (!offAsset) return;
         offAsset.cropConfig = {scale: 100, x: 0, y: 0};
         offAsset.maskDataUrl = null;
+        menuStudioState.maskTouched = true;
         if (menuStudioState.maskCanvas) {
           const mCtx = menuStudioState.maskCanvas.getContext("2d");
           mCtx.clearRect(0, 0, 300, 300);
@@ -1879,6 +1905,7 @@
 
       function eraseAt(cx, cy) {
         if (!menuStudioState.maskCanvas) return;
+        menuStudioState.maskTouched = true;
         const rect = canvasWrapper.getBoundingClientRect();
         const x = (cx - rect.left) * (300 / rect.width);
         const y = (cy - rect.top) * (300 / rect.height);
@@ -2082,30 +2109,120 @@
       return out;
     }
 
-    async function copyBaseMenuButtonTo(targetIds) {
-      const srcOff = state.assets[`${BASE_MENU_ID}_off`];
-      const srcOn = state.assets[`${BASE_MENU_ID}_on`];
-      if (!srcOff || (!srcOff.img && !srcOff.rawSourceImg)) return 0;
+    // コピー元(srcId)の完成状態を、コピー先(tid)用に完全複製して返す（まだ state には入れない）
+    async function buildMenuButtonClone(srcId, tid) {
+      const srcOff = state.assets[`${srcId}_off`];
+      const srcOn = state.assets[`${srcId}_on`];
+      if (!srcOff || (!srcOff.img && !srcOff.rawSourceImg)) return null;
+      const imgCache = new Map();
+      const newOff = await cloneMenuAsset(srcOff, imgCache);
+      const newOn = srcOn ? await cloneMenuAsset(srcOn, imgCache) : null;
+      // コピー先自身のOFFを参照するように付け替える
+      if (newOn) newOn.autoGenFrom = `${tid}_off`;
+      return {newOff, newOn};
+    }
 
+    function applyMenuButtonClone(tid, clone) {
+      state.assets[`${tid}_off`] = clone.newOff;
+      if (clone.newOn) {
+        state.assets[`${tid}_on`] = clone.newOn;
+      } else {
+        delete state.assets[`${tid}_on`];
+        ensureMenuButtonAssets(tid);
+      }
+    }
+
+    async function copyBaseMenuButtonTo(targetIds) {
       let count = 0;
       for (const tid of targetIds) {
         if (tid === BASE_MENU_ID || !SECTIONS.B.items.some(it => it.id === tid)) continue;
-        const imgCache = new Map();
-        const newOff = await cloneMenuAsset(srcOff, imgCache);
-        const newOn = srcOn ? await cloneMenuAsset(srcOn, imgCache) : null;
-        // コピー先自身のOFFを参照するように付け替える
-        if (newOn) newOn.autoGenFrom = `${tid}_off`;
-
-        state.assets[`${tid}_off`] = newOff;
-        if (newOn) {
-          state.assets[`${tid}_on`] = newOn;
-        } else {
-          delete state.assets[`${tid}_on`];
-          ensureMenuButtonAssets(tid);
-        }
+        const clone = await buildMenuButtonClone(BASE_MENU_ID, tid);
+        if (!clone) return count;
+        applyMenuButtonClone(tid, clone);
+        markMenuCustom(tid);   // 明示的な上書きコピー → 以後は親の変更で自動上書きしない
         count++;
       }
       return count;
+    }
+
+    // =========================================================================
+    // ★ 関連アイコン間の自動継承（親 → 子）
+    //   SECTIONS.B.items の inheritFrom に親を定義。子が「個別編集済み」でない間だけ親の状態を複製して継承する。
+    // =========================================================================
+    function markMenuCustom(itemId) {
+      const meta = SECTIONS.B.items.find(it => it.id === itemId);
+      if (!meta || !meta.inheritFrom) return;   // 親を持たないボタン(1,2,3,6,8)は対象外
+      if (state.menuCustom[itemId]) return;
+      state.menuCustom[itemId] = true;
+      if (menuStudioState.currentItemId === itemId) updateStudioItemBadge();
+      triggerAutoSave();
+    }
+
+    function menuImgSig(img) {
+      if (!img || !img.src) return "-";
+      const s = img.src, m = s.length >> 1;
+      return `${s.length}:${s.slice(24, 72)}:${s.slice(m, m + 48)}:${s.slice(-48)}`;
+    }
+
+    // 親の状態が変わったかを判定するための軽量シグネチャ
+    function menuStateSig(id) {
+      const o = state.assets[`${id}_off`];
+      const n = state.assets[`${id}_on`];
+      if (!o) return "";
+      const md = o.maskDataUrl || "";
+      return JSON.stringify([
+        menuImgSig(o.img), menuImgSig(o.rawSourceImg), o.cropConfig, `${md.length}:${md.slice(-48)}`, o.specsConfig, o.filename || "",
+        n ? [menuImgSig(n.img), n.cropConfig, n.autoGen, !!n.customUploaded, n.specsConfig] : null
+      ]);
+    }
+
+    function menuParentHasImage(id) {
+      const o = state.assets[`${id}_off`];
+      return !!(o && (o.img || o.rawSourceImg));
+    }
+
+    let menuInheritRunning = false;
+    let menuInheritPending = false;
+
+    async function syncMenuInheritance() {
+      if (menuInheritRunning) {menuInheritPending = true; return [];}
+      menuInheritRunning = true;
+      const changed = new Set();
+      try {
+        do {
+          menuInheritPending = false;
+          for (const it of SECTIONS.B.items) {
+            if (!it.inheritFrom) continue;
+            const cid = it.id, pid = it.inheritFrom;
+            if (state.menuCustom[cid]) continue;          // 個別編集済みの子は触らない
+            if (!menuParentHasImage(pid)) continue;        // 親に設定がなければ何もしない
+            const sig = menuStateSig(pid);
+            if (state.menuSynced[cid] === sig && menuParentHasImage(cid)) continue;   // 親が変わっていない
+
+            const clone = await buildMenuButtonClone(pid, cid);
+            // 複製中に子が個別編集された場合は上書きしない
+            if (!clone || state.menuCustom[cid]) continue;
+            applyMenuButtonClone(cid, clone);
+            state.menuSynced[cid] = sig;
+            changed.add(cid);
+          }
+        } while (menuInheritPending);
+      } finally {
+        menuInheritRunning = false;
+      }
+
+      if (changed.size) {
+        if (appUiReady) {
+          if (state.currentTab === "B") renderSectionContent("B");
+          const modal = document.getElementById("menuStudioModal");
+          if (modal && modal.classList.contains("active") && changed.has(menuStudioState.currentItemId)) {
+            refreshStudioItemData();   // 編集画面に表示中の子が更新された場合は読み込み直す
+          }
+          renderPreview();
+        }
+        triggerAutoSave();
+      }
+      return [...changed];
     }
 
     function openCopyBaseDialog() {
@@ -2207,9 +2324,19 @@
       // 実機プレビューの選択ボタンを、編集中のボタンに合わせる（編集対象と選択状態の矛盾を防ぐ）
       state.activeButtonKey = itemId;
 
-      const itemMeta = SECTIONS.B.items.find(it => it.id === itemId);
-      document.getElementById("menuStudioItemBadge").textContent = itemMeta ? itemMeta.label : itemId;
+      refreshStudioItemData();
+      document.getElementById("mStudioModeMoveBtn").click();
+      document.getElementById("mStudioTabOffBtn").click();
+      drawMenuStudio();
+      renderPreview();
 
+      // 親からの継承が未反映なら反映させる（反映されたらスタジオ表示も自動更新される）
+      syncMenuInheritance();
+    }
+
+    // 現在の編集対象ボタンの保存済みデータを、スタジオUIへ読み込み直す（タブ/編集モードは変えない）
+    function refreshStudioItemData() {
+      const itemId = menuStudioState.currentItemId;
       const {offAsset} = ensureMenuButtonAssets(itemId);
 
       // マスクはボタンごとに新規Canvasを作り、そのボタンのOFF設定からだけ復元する
@@ -2217,6 +2344,7 @@
       maskCv.width = 300;
       maskCv.height = 300;
       menuStudioState.maskCanvas = maskCv;
+      menuStudioState.maskTouched = false;
       if (offAsset.maskDataUrl) {
         const mImg = new Image();
         mImg.onload = () => {
@@ -2230,10 +2358,30 @@
 
       syncStudioSliders();
       syncStudioOnPanel();
-      document.getElementById("mStudioModeMoveBtn").click();
-      document.getElementById("mStudioTabOffBtn").click();
+      updateStudioItemBadge();
+      menuStudioState.baseSig = studioEditSig();   // 個別編集判定の基準（読み込み直後の状態）
       drawMenuStudio();
-      renderPreview();
+    }
+
+    function studioEditSig() {
+      const id = menuStudioState.currentItemId;
+      const off = state.assets[`${id}_off`];
+      const on = state.assets[`${id}_on`];
+      return JSON.stringify([off ? off.cropConfig : null, on ? on.autoGen : null]);
+    }
+
+    function updateStudioItemBadge() {
+      const id = menuStudioState.currentItemId;
+      const meta = SECTIONS.B.items.find(it => it.id === id);
+      const el = document.getElementById("menuStudioItemBadge");
+      if (!el) return;
+      let text = meta ? meta.label : id;
+      if (meta && meta.inheritFrom) {
+        const parent = SECTIONS.B.items.find(it => it.id === meta.inheritFrom);
+        const pName = parent ? parent.label.replace(/\s*\(.*\)\s*$/, "") : meta.inheritFrom;
+        text += state.menuCustom[id] ? "（個別編集済み）" : `（${pName}を継承中）`;
+      }
+      el.textContent = text;
     }
 
     function syncStudioSliders() {
@@ -2346,9 +2494,18 @@
     }
 
     function saveCurrentStudioItem() {
-      const offAsset = state.assets[`${menuStudioState.currentItemId}_off`];
-      const onAsset = state.assets[`${menuStudioState.currentItemId}_on`];
+      const savingItemId = menuStudioState.currentItemId;   // 非同期処理中に別ボタンへ移動しても、保存対象を取り違えない
+      const offAsset = state.assets[`${savingItemId}_off`];
+      const onAsset = state.assets[`${savingItemId}_on`];
       if (!offAsset) return;
+
+      // 子ボタンをスタジオで実際に編集していたら「個別編集済み」にする（開いて移動しただけでは変えない）
+      if (menuStudioState.baseSig != null &&
+          (studioEditSig() !== menuStudioState.baseSig || menuStudioState.maskTouched)) {
+        markMenuCustom(menuStudioState.currentItemId);
+        menuStudioState.baseSig = studioEditSig();
+        menuStudioState.maskTouched = false;
+      }
 
       const sourceImg = offAsset.rawSourceImg || offAsset.img;
       if (!sourceImg) return;
@@ -2376,7 +2533,7 @@
           onAsset.rawSourceImg = sourceImg;
           onAsset.cropConfig = {...offAsset.cropConfig};
           onAsset.maskDataUrl = offAsset.maskDataUrl;
-          onAsset.autoGenFrom = `${menuStudioState.currentItemId}_off`;
+          onAsset.autoGenFrom = `${savingItemId}_off`;
           onAsset.specsConfig = [{scale: 100, x: 0, y: 0}, {scale: 100, x: 0, y: 0}];
         }
 
@@ -3425,6 +3582,8 @@
       if (confirm("作業中のすべての画像・調整内容をリセットしますか？\n（ブラウザ内の保存データも消去されます）")) {
         await clearDB();
         state.assets = {};
+        state.menuCustom = {};
+        state.menuSynced = {};
         studioState.sourceImg = null;
         state.talkBgColor = "#edf8fb";
         renderSectionContent(state.currentTab);
