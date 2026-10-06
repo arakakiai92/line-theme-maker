@@ -203,7 +203,7 @@
             </button>
             <button id="copyHomeOnToAllBtn"
               class="bg-slate-800 hover:bg-black text-white font-bold px-2 py-1 rounded shadow-xs whitespace-nowrap transition flex items-center gap-1">
-              <span>⚡ 1番の設定を全ONへコピー</span>
+              <span>⚡ 1番の設定を全ON/OFFへコピー</span>
             </button>
             <button id="copyBaseToSelectedBtn" type="button"
               class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-2 py-1 rounded shadow-xs whitespace-nowrap transition flex items-center gap-1">
@@ -1093,26 +1093,48 @@
         document.getElementById("copyBaseToSelectedBtn").onclick = openCopyBaseDialog;
 
         document.getElementById("copyHomeOnToAllBtn").onclick = () => {
+          const homeOff = state.assets["B_home_off"];
           const homeOn = state.assets["B_home_on"];
+          if (!homeOff || (!homeOff.img && !homeOff.rawSourceImg)) {
+            alert("まずは1. ホームのOFF側をアップロードして調整してください。");
+            return;
+          }
           if (!homeOn || !homeOn.autoGen || !homeOn.autoGen.enabled) {
             alert("まずは1. ホームのON側で「✨ 全部盛りON加工エフェクト」を有効化して調整してください。");
             return;
           }
-          const targetConfig = JSON.parse(JSON.stringify(homeOn.autoGen));
+
+          // 1番のOFF側で編集した「大きさ・X・Y」を全ボタンのOFF側へコピー。
+          // 画像そのものは各ボタンの素材を維持し、位置・倍率だけを引き継ぐ。
+          const offConfig = JSON.parse(JSON.stringify(homeOff.cropConfig || {scale: 100, x: 0, y: 0}));
+          const onConfig = JSON.parse(JSON.stringify(homeOn.autoGen));
           let count = 0;
           SECTIONS.B.items.forEach(item => {
             if (item.id === "B_home") return;
             const off = state.assets[`${item.id}_off`];
-            if (off && (off.img || off.rawSourceImg)) {
-              applyAutoGenToItem(item.id, targetConfig);
-              markMenuCustom(item.id);   // 明示的な一括適用なので、子は個別扱い（親の変更で上書きしない）
-              count++;
+            if (!off || (!off.img && !off.rawSourceImg)) return;
+
+            off.cropConfig = {...offConfig};
+            // OFF側を基準にするため、ON側の参照元も各ボタン自身のOFFへ固定。
+            applyAutoGenToItem(item.id, onConfig);
+            const on = state.assets[`${item.id}_on`];
+            if (on) {
+              // ONの「位置・エフェクト」は1番からコピーするが、ON用の縮小率だけは
+              // コピー先の既存値を優先。新規生成時は100%にして、意図しない縮小を防ぐ。
+              const existingScale = on.autoGen && Number.isFinite(Number(on.autoGen.scaleRatio))
+                ? Number(on.autoGen.scaleRatio) : 100;
+              on.autoGen = {...onConfig, scaleRatio: existingScale};
+              on.autoGenFrom = `${item.id}_off`;
+              on.cropConfig = {...off.cropConfig};
             }
+
+            markMenuCustom(item.id);   // 明示的な一括適用なので、子は個別扱い
+            count++;
           });
           renderSectionContent("B");
           renderPreview();
           triggerAutoSave();
-          alert(`1番の設定を他の ${count} 個のボタンに一括適用しました！`);
+          alert(`1番のOFF位置・倍率とON設定を他の ${count} 個のボタンにコピーしました！`);
         };
       } else {
         quickBar.classList.add("hidden");
