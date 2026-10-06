@@ -201,13 +201,9 @@
               class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2 py-1 rounded shadow-xs whitespace-nowrap transition flex items-center gap-1">
               <span>🎛️ 専用スタジオでON/OFF確認</span>
             </button>
-            <button id="copyHomeOnToAllBtn"
+            <button id="copyHomeMasterToAllBtn"
               class="bg-slate-800 hover:bg-black text-white font-bold px-2 py-1 rounded shadow-xs whitespace-nowrap transition flex items-center gap-1">
-              <span>⚡ 1番の設定を全ON/OFFへコピー</span>
-            </button>
-            <button id="copyBaseToSelectedBtn" type="button"
-              class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-2 py-1 rounded shadow-xs whitespace-nowrap transition flex items-center gap-1">
-              <span>📋 1番をベースにコピー</span>
+              <span>⚡ 1番の設定を2〜9へ反映</span>
             </button>
           </div>
         </div>
@@ -789,6 +785,9 @@
         talkBgColor: state.talkBgColor,
         talkBgNone: !!state.talkBgNone,
         menuInheritOwn: state.menuOwn,
+        menuAndroidCustom: state.menuAndroidCustom,
+        menuI26Custom: state.menuI26Custom,
+        menuOnEffectCustom: state.menuOnEffectCustom,
         studioSourceDataUrl: studioState.sourceImg ? studioState.sourceImg.src : null,
         menuInheritCustom: state.menuCustom,
         assets: cleanAssets
@@ -872,6 +871,9 @@
               if (it.inheritFrom && menuButtonHasContent(it.id)) state.menuCustom[it.id] = true;
             });
           }
+          state.menuAndroidCustom = (data.menuAndroidCustom && typeof data.menuAndroidCustom === "object") ? {...data.menuAndroidCustom} : {};
+          state.menuI26Custom = (data.menuI26Custom && typeof data.menuI26Custom === "object") ? {...data.menuI26Custom} : {};
+          state.menuOnEffectCustom = (data.menuOnEffectCustom && typeof data.menuOnEffectCustom === "object") ? {...data.menuOnEffectCustom} : {};
           if (data.menuInheritOwn && typeof data.menuInheritOwn === "object") {
             state.menuOwn = {...data.menuInheritOwn};
           } else {
@@ -1008,6 +1010,9 @@
       talkBgNone: false, // F: 背景なし（透過）を選択中か（画像・調整値は保持したまま切り替え）
       menuOwn: {},      // 子ボタンIDごとの「自分の素材(アップロード/コピー)を持つ」フラグ（保存対象）
       menuCustom: {},   // 子ボタンIDごとの「個別編集済み」フラグ（保存対象）
+      menuAndroidCustom: {}, // 1番の通常/Android設定から個別に外したボタン
+      menuI26Custom: {},     // 1番のiOS 26設定から個別に外したボタン
+      menuOnEffectCustom: {},// 1番ONの加工・効果から個別に外したボタン
       menuSynced: {}    // 子ボタンIDごとの「最後に継承した親の状態シグネチャ」（メモリのみ）
     };
     let appUiReady = false;
@@ -1090,65 +1095,18 @@
           openMenuButtonStudio(state.activeButtonKey || "B_home");
         };
 
-        document.getElementById("copyBaseToSelectedBtn").onclick = openCopyBaseDialog;
-
-        document.getElementById("copyHomeOnToAllBtn").onclick = () => {
+        document.getElementById("copyHomeMasterToAllBtn").onclick = async () => {
           const homeOff = state.assets["B_home_off"];
-          if (!homeOff || (!homeOff.img && !homeOff.rawSourceImg)) {
-            alert("まずは1. ホームのOFF側をアップロードして調整してください。");
+          const homeOn = state.assets["B_home_on"];
+          if (!homeOff || !(homeOff.img || homeOff.rawSourceImg)) {
+            alert("まずは1. ホームのOFF画像を登録・調整してください。");
             return;
           }
-
-          // ★ この一括コピーの基準は「1番のOFF側」。
-          // 1番で最初に調整した大きさ・X・Yを、そのまま2〜9番の
-          // OFF/ON両方の基本配置へコピーする。
-          // ON側のエフェクト設定（ネオン・フチ等）は各ボタンのものを維持する。
-          // ただしON側の autoGen による縮小・Yずれは、OFFと同じ見た目の
-          // 大きさ/位置にするため無効化する（scaleRatio=100 / yShift=0）。
-          const baseConfig = JSON.parse(JSON.stringify(
-            homeOff.cropConfig || {scale: 100, x: 0, y: 0}
-          ));
-          let count = 0;
-
-          SECTIONS.B.items.forEach(item => {
-            if (item.id === "B_home") return;
-
-            const off = state.assets[`${item.id}_off`];
-            if (!off || (!off.img && !off.rawSourceImg)) return;
-
-            // OFF：1番OFFの大きさ・位置をそのままコピー。
-            off.cropConfig = {...baseConfig};
-
-            // ON：存在しなければ既存の自動生成経路で用意する。
-            let on = state.assets[`${item.id}_on`];
-            if (!on) {
-              applyAutoGenToItem(item.id, {
-                enabled: true, scaleRatio: 100, yShift: 0,
-                brightness: 100, saturate: 100,
-                neonEnabled: false, outlineEnabled: false,
-                pillEnabled: false, shadowEnabled: false
-              });
-              on = state.assets[`${item.id}_on`];
-            }
-
-            if (on) {
-              // ONも同じ元画像配置を使用。ON固有のエフェクトは保持する。
-              on.cropConfig = {...baseConfig};
-              on.autoGenFrom = `${item.id}_off`;
-              if (!on.autoGen) on.autoGen = {enabled: true};
-              on.autoGen.enabled = true;
-              on.autoGen.scaleRatio = 100;
-              on.autoGen.yShift = 0;
-            }
-
-            markMenuCustom(item.id);
-            count++;
-          });
-
+          const n = await applyHomeMasterToAll(true);
           renderSectionContent("B");
           renderPreview();
           triggerAutoSave();
-          alert(`1番OFFの大きさ・位置を、他の ${count} 個のボタンのOFF/ONへコピーしました！`);
+          alert(`1番の設定（通常/Android・iOS 26・ON加工）を ${n} 個のボタンへ反映しました。`);
         };
       } else {
         quickBar.classList.add("hidden");
@@ -1658,7 +1616,14 @@
           e.stopPropagation();
           if (opt.key.startsWith("B_")) {
             const itemId = opt.parentItemKey || opt.key.split('_').slice(0, 2).join('_');
-            openMenuButtonStudio(itemId);
+            const idx = parseInt(btn.dataset.idx) || 0;
+            // iOS 26 は出力専用の位置・サイズを個別調整できる。
+            // 従来/Android は専用スタジオ（ONならONタブ）で調整する。
+            if (idx === 0) {
+              openAssetAdjuster(opt.key, idx);
+            } else {
+              openMenuButtonStudio(itemId, opt.isButtonOn ? "on" : "off");
+            }
           } else if (adjGroupOf(opt.key)) {
             openAssetAdjuster(opt.key, parseInt(btn.dataset.idx) || 0);
           }
@@ -2280,6 +2245,15 @@
         stopTapSimulation();
         ensureAgEnabled(onAsset);
         callback(onAsset.autoGen);
+        if (menuStudioState.currentItemId === BASE_MENU_ID) {
+          applyHomeOnEffectMaster(false).then(() => {
+            renderSectionContent("B");
+            renderPreview();
+            triggerAutoSave();
+          });
+        } else {
+          markMenuSettingCustom(menuStudioState.currentItemId, "onEffect");
+        }
         setStudioTab("on");
       }
 
@@ -2351,7 +2325,11 @@
     }
 
     // =========================================================================
-    // ★ 1番をベースにコピー（複製）: 1番の完成状態を任意のメニューボタンへ独立コピー
+    // ★ B: 1番をマスターにした設定継承
+    //   ・通常/Androidの位置・サイズ = 1番OFFの cropConfig
+    //   ・iOS 26の位置・サイズ       = 1番の specsConfig[0]
+    //   ・ONの加工・効果              = 1番ONの autoGen
+    //   各項目を個別編集した場合、その項目だけ1番から独立する。
     // =========================================================================
     const BASE_MENU_ID = SECTIONS.B.items[0].id;
 
@@ -2361,224 +2339,118 @@
       return !!((o && (o.img || o.rawSourceImg)) || (n && n.customUploaded));
     }
 
-    function cloneImageElement(img) {
-      return new Promise(resolve => {
-        if (!img || !img.src) {resolve(img || null); return;}
-        const c = new Image();
-        c.onload = () => resolve(c);
-        c.onerror = () => resolve(img);
-        c.src = img.src;
+    function clonePlain(v, fallback = null) {
+      return v == null ? fallback : JSON.parse(JSON.stringify(v));
+    }
+
+    function getMenuConf(asset, idx) {
+      if (!asset) return {scale: 100, x: 0, y: 0};
+      if (!Array.isArray(asset.specsConfig)) asset.specsConfig = [];
+      while (asset.specsConfig.length < 2) asset.specsConfig.push({scale: 100, x: 0, y: 0});
+      return asset.specsConfig[idx] || {scale: 100, x: 0, y: 0};
+    }
+
+    function setMenuConf(asset, idx, conf) {
+      if (!asset) return;
+      if (!Array.isArray(asset.specsConfig)) asset.specsConfig = [];
+      while (asset.specsConfig.length < 2) asset.specsConfig.push({scale: 100, x: 0, y: 0});
+      asset.specsConfig[idx] = clonePlain(conf, {scale: 100, x: 0, y: 0});
+    }
+
+    function markMenuSettingCustom(itemId, kind) {
+      if (itemId === BASE_MENU_ID) return;
+      if (kind === "android") state.menuAndroidCustom[itemId] = true;
+      if (kind === "ios26") state.menuI26Custom[itemId] = true;
+      if (kind === "onEffect") state.menuOnEffectCustom[itemId] = true;
+    }
+
+    async function rebuildMenuImageFromOwnSource(asset, cropConfig) {
+      if (!asset) return;
+      const raw = asset.rawSourceImg || asset.img;
+      if (!raw) return;
+      const conf = clonePlain(cropConfig, {scale: 100, x: 0, y: 0});
+      const cv = cropSourceImageFromEditor(raw, 300, 300, conf.scale, conf.x, conf.y, null);
+      await new Promise(resolve => {
+        const img = new Image();
+        img.onload = () => { asset.img = img; asset.cropConfig = conf; resolve(); };
+        img.onerror = () => { asset.cropConfig = conf; resolve(); };
+        img.src = cv.toDataURL("image/png");
       });
     }
 
-    // アセット1件を完全複製（Imageは再生成、オブジェクトはディープコピー。参照は一切共有しない）
-    async function cloneMenuAsset(src, imgCache) {
-      const out = {};
-      for (const [k, v] of Object.entries(src)) {
-        if (v instanceof HTMLImageElement) {
-          if (!imgCache.has(v)) imgCache.set(v, await cloneImageElement(v));
-          out[k] = imgCache.get(v);
-        } else if (v && typeof v === "object") {
-          out[k] = JSON.parse(JSON.stringify(v));
-        } else {
-          out[k] = v;
-        }
-      }
-      return out;
-    }
+    async function applyHomeMasterToAll(force = false) {
+      const homeOff = state.assets["B_home_off"];
+      const homeOn = state.assets["B_home_on"];
+      if (!homeOff || !(homeOff.img || homeOff.rawSourceImg)) return 0;
 
-    // コピー元(srcId)の完成状態を、コピー先(tid)用に完全複製して返す（まだ state には入れない）
-    async function buildMenuButtonClone(srcId, tid) {
-      const srcOff = state.assets[`${srcId}_off`];
-      const srcOn = state.assets[`${srcId}_on`];
-      if (!srcOff || (!srcOff.img && !srcOff.rawSourceImg)) return null;
-      const imgCache = new Map();
-      const newOff = await cloneMenuAsset(srcOff, imgCache);
-      const newOn = srcOn ? await cloneMenuAsset(srcOn, imgCache) : null;
-      // コピー先自身のOFFを参照するように付け替える
-      if (newOn) newOn.autoGenFrom = `${tid}_off`;
-      return {newOff, newOn};
-    }
-
-    function applyMenuButtonClone(tid, clone) {
-      state.assets[`${tid}_off`] = clone.newOff;
-      if (clone.newOn) {
-        state.assets[`${tid}_on`] = clone.newOn;
-      } else {
-        delete state.assets[`${tid}_on`];
-        ensureMenuButtonAssets(tid);
-      }
-    }
-
-    async function copyBaseMenuButtonTo(targetIds) {
+      const androidMaster = clonePlain(homeOff.cropConfig, {scale: 100, x: 0, y: 0});
+      const ios26Master = clonePlain(getMenuConf(homeOff, 0), {scale: 100, x: 0, y: 0});
+      const onMaster = homeOn?.autoGen ? clonePlain(homeOn.autoGen) : null;
       let count = 0;
-      for (const tid of targetIds) {
-        if (tid === BASE_MENU_ID || !SECTIONS.B.items.some(it => it.id === tid)) continue;
-        const clone = await buildMenuButtonClone(BASE_MENU_ID, tid);
-        if (!clone) return count;
-        applyMenuButtonClone(tid, clone);
-        markMenuCustom(tid);   // 明示的な上書きコピー → 以後は親の変更で自動上書きしない
-        markMenuOwn(tid);
+
+      for (const item of SECTIONS.B.items) {
+        if (item.id === BASE_MENU_ID) continue;
+        const off = state.assets[`${item.id}_off`];
+        const on = state.assets[`${item.id}_on`];
+        if (!off && !on) continue;
+
+        if (force || !state.menuAndroidCustom[item.id]) {
+          if (off) await rebuildMenuImageFromOwnSource(off, androidMaster);
+          if (on && on !== off) {
+            // ONが自作画像なら自作画像自身に、通常ONならOFFと同じ基準を適用
+            await rebuildMenuImageFromOwnSource(on, androidMaster);
+            if (!on.customUploaded) on.cropConfig = clonePlain(androidMaster);
+          }
+          state.menuAndroidCustom[item.id] = false;
+        }
+
+        if (force || !state.menuI26Custom[item.id]) {
+          if (off) setMenuConf(off, 0, ios26Master);
+          if (on) setMenuConf(on, 0, ios26Master);
+          state.menuI26Custom[item.id] = false;
+        }
+
+        if (onMaster && (force || !state.menuOnEffectCustom[item.id])) {
+          on.autoGen = clonePlain(onMaster);
+          on.autoGenFrom = `${item.id}_off`;
+          state.menuOnEffectCustom[item.id] = false;
+        }
         count++;
       }
       return count;
     }
 
-    // =========================================================================
-    // ★ 関連アイコン間の自動継承（親 → 子）
-    //   SECTIONS.B.items の inheritFrom に親を定義。子が「個別編集済み」でない間だけ親の状態を複製して継承する。
-    // =========================================================================
-    // 子が自分の素材（アップロード／明示コピー）を持つことを記録（調整リセットでも素材を守るため）
-    function markMenuOwn(itemId) {
-      const meta = SECTIONS.B.items.find(it => it.id === itemId);
-      if (!meta || !meta.inheritFrom || state.menuOwn[itemId]) return;
-      state.menuOwn[itemId] = true;
-      triggerAutoSave();
-    }
-
-    function markMenuCustom(itemId) {
-      const meta = SECTIONS.B.items.find(it => it.id === itemId);
-      if (!meta || !meta.inheritFrom) return;   // 親を持たないボタン(1,2,3,6,8)は対象外
-      if (state.menuCustom[itemId]) return;
-      state.menuCustom[itemId] = true;
-      if (menuStudioState.currentItemId === itemId) updateStudioItemBadge();
-      triggerAutoSave();
-    }
-
-    function menuImgSig(img) {
-      if (!img || !img.src) return "-";
-      const s = img.src, m = s.length >> 1;
-      return `${s.length}:${s.slice(24, 72)}:${s.slice(m, m + 48)}:${s.slice(-48)}`;
-    }
-
-    // 親の状態が変わったかを判定するための軽量シグネチャ
-    function menuStateSig(id) {
-      const o = state.assets[`${id}_off`];
-      const n = state.assets[`${id}_on`];
-      if (!o) return "";
-      const md = o.maskDataUrl || "";
-      return JSON.stringify([
-        menuImgSig(o.img), menuImgSig(o.rawSourceImg), o.cropConfig, `${md.length}:${md.slice(-48)}`, o.specsConfig, o.filename || "",
-        n ? [menuImgSig(n.img), n.cropConfig, n.autoGen, !!n.customUploaded, n.specsConfig] : null
-      ]);
-    }
-
-    function menuParentHasImage(id) {
-      const o = state.assets[`${id}_off`];
-      return !!(o && (o.img || o.rawSourceImg));
-    }
-
-    let menuInheritRunning = false;
-    let menuInheritPending = false;
-
-    async function syncMenuInheritance() {
-      if (menuInheritRunning) {menuInheritPending = true; return [];}
-      menuInheritRunning = true;
-      const changed = new Set();
-      try {
-        do {
-          menuInheritPending = false;
-          for (const it of SECTIONS.B.items) {
-            if (!it.inheritFrom) continue;
-            const cid = it.id, pid = it.inheritFrom;
-            if (state.menuCustom[cid]) continue;          // 個別編集済みの子は触らない
-            if (!menuParentHasImage(pid)) continue;        // 親に設定がなければ何もしない
-            const sig = menuStateSig(pid);
-            if (state.menuSynced[cid] === sig && menuParentHasImage(cid)) continue;   // 親が変わっていない
-
-            const clone = await buildMenuButtonClone(pid, cid);
-            // 複製中に子が個別編集された場合は上書きしない
-            if (!clone || state.menuCustom[cid]) continue;
-            applyMenuButtonClone(cid, clone);
-            state.menuSynced[cid] = sig;
-            changed.add(cid);
-          }
-        } while (menuInheritPending);
-      } finally {
-        menuInheritRunning = false;
-      }
-
-      if (changed.size) {
-        if (appUiReady) {
-          if (state.currentTab === "B") renderSectionContent("B");
-          const modal = document.getElementById("menuStudioModal");
-          if (modal && modal.classList.contains("active") && changed.has(menuStudioState.currentItemId)) {
-            refreshStudioItemData();   // 編集画面に表示中の子が更新された場合は読み込み直す
-          }
-          renderPreview();
+    async function applyHomeOnEffectMaster(force = false) {
+      const homeOn = state.assets["B_home_on"];
+      if (!homeOn?.autoGen) return 0;
+      const master = clonePlain(homeOn.autoGen);
+      let count = 0;
+      for (const item of SECTIONS.B.items) {
+        if (item.id === BASE_MENU_ID) continue;
+        const on = state.assets[`${item.id}_on`];
+        if (!on) continue;
+        if (force || !state.menuOnEffectCustom[item.id]) {
+          on.autoGen = clonePlain(master);
+          on.autoGenFrom = `${item.id}_off`;
+          state.menuOnEffectCustom[item.id] = false;
+          count++;
         }
-        triggerAutoSave();
       }
-      return [...changed];
+      return count;
     }
 
-    function openCopyBaseDialog() {
-      const srcOff = state.assets[`${BASE_MENU_ID}_off`];
-      if (!srcOff || (!srcOff.img && !srcOff.rawSourceImg)) {
-        alert("まずは1番(ホーム)のOFF画像を登録・調整してください。");
-        return;
-      }
-      document.getElementById("copyBaseDialog")?.remove();
-
-      const baseLabel = SECTIONS.B.items[0].label;
-      const targets = SECTIONS.B.items.filter(it => it.id !== BASE_MENU_ID);
-      const overlay = document.createElement("div");
-      overlay.id = "copyBaseDialog";
-      overlay.className = "fixed inset-0 z-[60] bg-black/70 flex items-center justify-center p-3";
-      overlay.innerHTML = `
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-          <div class="bg-indigo-600 text-white px-4 py-3">
-            <h3 class="font-bold text-sm">📋 1番をベースにコピー</h3>
-            <p class="text-[10px] text-indigo-100 mt-0.5">コピー元: ${baseLabel}（複製後はコピー先が完全に独立します）</p>
-          </div>
-          <div class="p-3 text-xs">
-            <div class="flex items-center justify-between mb-1.5">
-              <span class="font-bold text-slate-700">コピー先を選択</span>
-              <span class="flex gap-1">
-                <button type="button" id="copyBaseSelAll" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 font-semibold">全て選択</button>
-                <button type="button" id="copyBaseSelNone" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 font-semibold">全解除</button>
-              </span>
-            </div>
-            <div class="max-h-[50vh] overflow-y-auto space-y-1">
-              ${targets.map(it => `
-                <label class="flex items-center gap-2 px-2 py-1.5 rounded border border-slate-200 hover:bg-slate-50 cursor-pointer">
-                  <input type="checkbox" class="copy-base-chk rounded" value="${it.id}">
-                  <span class="font-semibold text-slate-800">${it.label}</span>
-                  ${menuButtonHasContent(it.id) ? '<span class="ml-auto text-[9px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1">設定済み（上書き）</span>' : ''}
-                </label>`).join("")}
-            </div>
-          </div>
-          <div class="px-3 pb-3 flex justify-end gap-2 text-xs">
-            <button type="button" id="copyBaseCancel" class="px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200 font-bold">キャンセル</button>
-            <button type="button" id="copyBaseRun" class="px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white font-bold disabled:opacity-40" disabled>選択した項目にコピー</button>
-          </div>
-        </div>`;
-      document.body.appendChild(overlay);
-
-      const chks = () => [...overlay.querySelectorAll(".copy-base-chk")];
-      const runBtn = overlay.querySelector("#copyBaseRun");
-      const refresh = () => {runBtn.disabled = !chks().some(c => c.checked);};
-      chks().forEach(c => c.onchange = refresh);
-      overlay.querySelector("#copyBaseSelAll").onclick = () => {chks().forEach(c => c.checked = true); refresh();};
-      overlay.querySelector("#copyBaseSelNone").onclick = () => {chks().forEach(c => c.checked = false); refresh();};
-      overlay.querySelector("#copyBaseCancel").onclick = () => overlay.remove();
-      overlay.addEventListener("mousedown", (e) => {if (e.target === overlay) overlay.remove();});
-
-      runBtn.onclick = async () => {
-        const ids = chks().filter(c => c.checked).map(c => c.value);
-        if (!ids.length) return;
-        const overwrite = ids.filter(menuButtonHasContent);
-        if (overwrite.length && !confirm(`設定済みのボタン ${overwrite.length} 個を上書きします。よろしいですか？`)) return;
-        runBtn.disabled = true;
-        const n = await copyBaseMenuButtonTo(ids);
-        overlay.remove();
+    async function syncHomeMasterIfNeeded(kind, sourceItemId) {
+      if (sourceItemId !== BASE_MENU_ID) return;
+      await applyHomeMasterToAll(false);
+      if (appUiReady && state.currentTab === "B") {
         renderSectionContent("B");
         renderPreview();
-        triggerAutoSave();
-        alert(`1番をベースに ${n} 個のボタンへ複製しました。以降は各ボタンを独立して編集できます。`);
-      };
+      }
     }
 
+    // =========================================================================
+    // ★ 関連アイコン間の自動継承（既存の 3→4 / 6→5・7 / 8→9）
+    // =========================================================================
     // =========================================================================
     // ★ B: 透明PNGの「配置のみ」自動調整
     //   アイコンの大きさ(拡大率)は自動では一切変更しない。
@@ -2674,17 +2546,24 @@
       if (key.startsWith("profile_")) return "E";
       if (key === "talk_bg") return "F";
       if (key === "menu_bg") return "C";
+      if (key.startsWith("B_")) return "B";
       return null;
     }
 
     function adjTargetKeys(group) {
       if (group === "D") return SECTIONS.D.items.flatMap(it => [`${it.id}_off`, `${it.id}_on`]);
       if (group === "A" || group === "C" || group === "E" || group === "F") return SECTIONS[group].items.map(it => it.id);
+      if (group === "B") return SECTIONS.B.items.flatMap(it => [`${it.id}_off`, `${it.id}_on`]);
       return [];
     }
 
     function adjTargetLabel(key) {
       const g = adjGroupOf(key);
+      if (g === "B") {
+        const id = key.replace(/_(off|on)$/, "");
+        const it = SECTIONS.B.items.find(x => x.id === id);
+        return `B: ${it ? it.label : id} ${key.endsWith("_on") ? "ON" : "OFF"}`;
+      }
       if (g === "D") {
         const id = key.replace(/_(off|on)$/, "");
         const it = SECTIONS.D.items.find(x => x.id === id);
@@ -2758,6 +2637,26 @@
         opt.specs.forEach((sp, j) => {
           if (j !== adjState.idx) a.specsConfig[j] = adjClampConf(opt, sp, a.img, src);
         });
+      }
+      // BのiOS 26 / 従来・Androidは、1番をそれぞれのマスターにする。
+      // 2〜9を個別調整した場合だけ、その出力は1番から独立する。
+      if (adjGroupOf(adjState.key) === "B" && (adjState.idx === 0 || adjState.idx === 1)) {
+        const itemId = adjState.key.replace(/_(off|on)$/, "");
+        const kind = adjState.idx === 0 ? "ios26" : "android";
+        if (itemId === BASE_MENU_ID) {
+          const master = clonePlain(a.specsConfig[adjState.idx]);
+          const homeOff = state.assets["B_home_off"];
+          const homeOn = state.assets["B_home_on"];
+          if (homeOff) setMenuConf(homeOff, adjState.idx, master);
+          if (homeOn) setMenuConf(homeOn, adjState.idx, master);
+          applyHomeMasterToAll(false).then(() => {
+            renderSectionContent("B");
+            renderPreview();
+            triggerAutoSave();
+          });
+        } else {
+          markMenuSettingCustom(itemId, kind);
+        }
       }
       adjAfterChange();
     }
@@ -2882,13 +2781,14 @@
     function adjLoadTarget(key, idx) {
       const opt = assetOptRegistry[key];
       const a = state.assets[key];
+      const g = adjGroupOf(key);
       adjState.key = key;
       adjState.idx = Math.min(idx || 0, opt.specs.length - 1);
       if (!Array.isArray(a.specsConfig)) a.specsConfig = [];
       while (a.specsConfig.length < opt.specs.length) a.specsConfig.push({scale: 100, x: 0, y: 0});
       adjState.snapshot = JSON.parse(JSON.stringify(a.specsConfig));
       const c = a.specsConfig;
-      adjState.linked = opt.specs.length > 1 && c.every(v => v.scale === c[0].scale && v.x === c[0].x && v.y === c[0].y);
+      adjState.linked = g === "B" ? false : (opt.specs.length > 1 && c.every(v => v.scale === c[0].scale && v.x === c[0].x && v.y === c[0].y));
       document.getElementById("adjLinkChk").checked = adjState.linked;
       document.getElementById("adjTargetBadge").textContent = adjTargetLabel(key);
       document.getElementById("adjSubLabel").textContent = (key === "talk_bg" && state.talkBgNone)
@@ -2946,25 +2846,10 @@
     function adjStep(dir) {
       const group = adjGroupOf(adjState.key);
       const keys = adjTargetKeys(group).filter(k => adjHasImage(k) && assetOptRegistry[k]);
-
-      // 複数の画像があるグループは「画像」単位で移動。
-      if (keys.length >= 2) {
-        const i = keys.indexOf(adjState.key);
-        const next = keys[(i + dir + keys.length) % keys.length];
-        adjLoadTarget(next, adjState.idx);
-        adjSetStatus("調整は自動で保存されます", false);
-        return;
-      }
-
-      // A/C/Fなど、元画像が1枚で出力先が複数ある場合は、
-      // 「前の画像 / 次の画像」を出力先（iOS / Android / STORE等）の切替として機能させる。
-      const curOpt = assetOptRegistry[adjState.key];
-      if (!curOpt || !curOpt.specs || curOpt.specs.length < 2) return;
-      const nextIdx = (adjState.idx + dir + curOpt.specs.length) % curOpt.specs.length;
-      adjState.idx = nextIdx;
-      adjBuildTabs();
-      adjSyncControls();
-      adjDraw();
+      if (keys.length < 2) return;
+      const i = keys.indexOf(adjState.key);
+      const next = keys[(i + dir + keys.length) % keys.length];
+      adjLoadTarget(next, adjState.idx);
       adjSetStatus("調整は自動で保存されます", false);
     }
 
@@ -3045,11 +2930,11 @@
       }, {passive: false});
     }
 
-    function openMenuButtonStudio(itemId) {
+    function openMenuButtonStudio(itemId, initialMode = "off") {
       const modal = document.getElementById("menuStudioModal");
       modal.classList.add("active");
       modal.classList.remove("pointer-events-none");
-      loadItemIntoStudio(itemId);
+      loadItemIntoStudio(itemId, initialMode);
     }
 
     // ★ 1〜9共通: 指定ボタン自身の OFF/ON アセットを必ず用意して返す（他ボタンとは一切共有しない）
@@ -3070,7 +2955,7 @@
       return {offAsset: state.assets[`${itemId}_off`], onAsset: state.assets[`${itemId}_on`]};
     }
 
-    function loadItemIntoStudio(itemId) {
+    function loadItemIntoStudio(itemId, initialMode = "off") {
       menuStudioState.currentItemId = itemId;
       document.getElementById("menuStudioItemSelect").value = itemId;
 
@@ -3079,7 +2964,8 @@
 
       refreshStudioItemData();
       document.getElementById("mStudioModeMoveBtn").click();
-      document.getElementById("mStudioTabOffBtn").click();
+      if (initialMode === "on") document.getElementById("mStudioTabOnBtn").click();
+      else document.getElementById("mStudioTabOffBtn").click();
       drawMenuStudio();
       renderPreview();
 
@@ -3262,9 +3148,17 @@
       if (!offAsset) return;
 
       // 子ボタンをスタジオで実際に編集していたら「個別編集済み」にする（開いて移動しただけでは変えない）
+      const beforeOffCrop = clonePlain(offAsset.cropConfig, {scale: 100, x: 0, y: 0});
+      const beforeOnAuto = clonePlain(onAsset?.autoGen, null);
       if (menuStudioState.baseSig != null &&
           (studioEditSig() !== menuStudioState.baseSig || menuStudioState.maskTouched)) {
         markMenuCustom(menuStudioState.currentItemId);
+        if (savingItemId !== BASE_MENU_ID) {
+          const cropChanged = JSON.stringify(beforeOffCrop) !== JSON.stringify(offAsset.cropConfig) || menuStudioState.maskTouched;
+          const onChanged = JSON.stringify(beforeOnAuto) !== JSON.stringify(onAsset?.autoGen);
+          if (cropChanged) markMenuSettingCustom(savingItemId, "android");
+          if (onChanged) markMenuSettingCustom(savingItemId, "onEffect");
+        }
         menuStudioState.baseSig = studioEditSig();
         menuStudioState.maskTouched = false;
       }
@@ -3288,7 +3182,7 @@
       const newImg = new Image();
       newImg.onload = () => {
         offAsset.img = newImg;
-        offAsset.specsConfig = [{scale: 100, x: 0, y: 0}, {scale: 100, x: 0, y: 0}];
+        if (!Array.isArray(offAsset.specsConfig)) offAsset.specsConfig = [{scale: 100, x: 0, y: 0}, {scale: 100, x: 0, y: 0}];
 
         if (onAsset) {
           onAsset.img = newImg;
@@ -3296,12 +3190,16 @@
           onAsset.cropConfig = {...offAsset.cropConfig};
           onAsset.maskDataUrl = offAsset.maskDataUrl;
           onAsset.autoGenFrom = `${savingItemId}_off`;
-          onAsset.specsConfig = [{scale: 100, x: 0, y: 0}, {scale: 100, x: 0, y: 0}];
+          if (!Array.isArray(onAsset.specsConfig)) onAsset.specsConfig = [{scale: 100, x: 0, y: 0}, {scale: 100, x: 0, y: 0}];
         }
 
-        renderSectionContent("B");
-        renderPreview();
-        triggerAutoSave();
+        const finish = async () => {
+          if (savingItemId === BASE_MENU_ID) await applyHomeMasterToAll(false);
+          renderSectionContent("B");
+          renderPreview();
+          triggerAutoSave();
+        };
+        finish();
       };
       newImg.src = croppedCanvas.toDataURL("image/png");
     }
@@ -4698,6 +4596,9 @@
         }
       });
       state.menuCustom = nextCustom;
+      state.menuAndroidCustom = {};
+      state.menuI26Custom = {};
+      state.menuOnEffectCustom = {};
       state.menuSynced = {};
       await syncMenuInheritance();
 
