@@ -387,7 +387,7 @@
             <div id="adjSpecTabs" class="flex gap-1"></div>
             <label id="adjLinkRow" class="mt-1.5 flex items-center gap-1.5 text-[10px] text-slate-600 cursor-pointer select-none">
               <input type="checkbox" id="adjLinkChk" class="rounded text-emerald-600">
-              <span>iPhone / Android に同じ調整を反映（連動）</span>
+              <span>複数の出力に同じ調整を反映（連動）</span>
             </label>
           </div>
 
@@ -1501,7 +1501,7 @@
     }
 
     function createCompactUploader(parent, opt) {
-      assetOptRegistry[opt.key] = opt;   // D/E/F 調整モーダルが出力サイズ・モードを参照するための登録
+      assetOptRegistry[opt.key] = opt;   // A/C/D/E/F 調整モーダルが出力サイズ・モードを参照するための登録
       if (!state.assets[opt.key]) {
         state.assets[opt.key] = {
           img: null,
@@ -2624,22 +2624,27 @@
     }
 
     // =========================================================================
-    // ★ D / E / F: 画像調整モーダル（出力ごとの specsConfig を直接編集）
+    // ★ A / C / D / E / F: 画像調整モーダル（出力ごとの specsConfig を直接編集）
     //   B専用のIDやspecsConfigは使わず、各アップローダーが持つ spec（出力サイズ）と mode をそのまま使う。
     // =========================================================================
     const assetOptRegistry = {};
     const adjState = {key: null, idx: 0, linked: false, snapshot: null, drag: null, raf: 0, observer: null, statusTimer: null};
 
     function adjGroupOf(key) {
+      // A〜Fのうち、共通の画像調整モーダルで扱えるグループを返す。
+      // Bは専用スタジオ、A/C/D/E/Fはこのモーダルを使用する。
+      if (key === "main") return "A";
       if (key.startsWith("pass_")) return "D";
       if (key.startsWith("profile_")) return "E";
       if (key === "talk_bg") return "F";
+      if (key === "menu_bg") return "C";
       return null;
     }
 
     function adjTargetKeys(group) {
       if (group === "D") return SECTIONS.D.items.flatMap(it => [`${it.id}_off`, `${it.id}_on`]);
-      return SECTIONS[group].items.map(it => it.id);
+      if (group === "A" || group === "C" || group === "E" || group === "F") return SECTIONS[group].items.map(it => it.id);
+      return [];
     }
 
     function adjTargetLabel(key) {
@@ -2852,7 +2857,9 @@
       document.getElementById("adjTargetBadge").textContent = adjTargetLabel(key);
       document.getElementById("adjSubLabel").textContent = (key === "talk_bg" && state.talkBgNone)
         ? "※ 現在「背景なし（透過）」が選択中のため、出力・プレビューには使われません（調整値は保持されます）"
-        : "出力サイズどおりの見え方で調整できます";
+        : (key === "main"
+          ? "出力サイズごとに、拡大縮小・位置を調整してトリミング範囲を選べます"
+          : "出力サイズどおりの見え方で調整できます");
       document.getElementById("adjTargetSelect").value = key;
       adjBuildTabs();
       adjSyncControls();
