@@ -197,6 +197,18 @@
             <div id="jumpButtons" class="flex items-center gap-1"></div>
           </div>
           <div class="flex items-center gap-1">
+            <button id="openMenuStudioGlobalBtn"
+              class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2 py-1 rounded shadow-xs whitespace-nowrap transition flex items-center gap-1">
+              <span>🎛️ 専用スタジオでON/OFF確認</span>
+            </button>
+            <button id="copyHomeOnToAllBtn"
+              class="bg-slate-800 hover:bg-black text-white font-bold px-2 py-1 rounded shadow-xs whitespace-nowrap transition flex items-center gap-1">
+              <span>⚡ 1番の設定を全ON/OFFへコピー</span>
+            </button>
+            <button id="copyBaseToSelectedBtn" type="button"
+              class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-2 py-1 rounded shadow-xs whitespace-nowrap transition flex items-center gap-1">
+              <span>📋 1番をベースにコピー</span>
+            </button>
           </div>
         </div>
 
@@ -779,7 +791,6 @@
         menuInheritOwn: state.menuOwn,
         studioSourceDataUrl: studioState.sourceImg ? studioState.sourceImg.src : null,
         menuInheritCustom: state.menuCustom,
-        menuMasterCustom: state.menuMasterCustom,
         assets: cleanAssets
       });
 
@@ -853,11 +864,6 @@
           });
 
           // 子ボタンの「個別編集済み」状態を復元。旧データ(項目なし)は既存の中身を守るため個別編集済み扱いにする
-          if (data.menuMasterCustom && typeof data.menuMasterCustom === "object") {
-            state.menuMasterCustom = {...data.menuMasterCustom};
-          } else {
-            state.menuMasterCustom = {};
-          }
           if (data.menuInheritCustom && typeof data.menuInheritCustom === "object") {
             state.menuCustom = {...data.menuInheritCustom};
           } else {
@@ -1002,8 +1008,7 @@
       talkBgNone: false, // F: 背景なし（透過）を選択中か（画像・調整値は保持したまま切り替え）
       menuOwn: {},      // 子ボタンIDごとの「自分の素材(アップロード/コピー)を持つ」フラグ（保存対象）
       menuCustom: {},   // 子ボタンIDごとの「個別編集済み」フラグ（保存対象）
-      menuSynced: {},   // 子ボタンIDごとの「最後に継承した親の状態シグネチャ」（メモリのみ）
-      menuMasterCustom: {} // 1番マスターから独立した設定カテゴリ（子ごとに保存）
+      menuSynced: {}    // 子ボタンIDごとの「最後に継承した親の状態シグネチャ」（メモリのみ）
     };
     let appUiReady = false;
 
@@ -1014,7 +1019,6 @@
       await initDB();
       const restored = await loadFromDB();
       await syncMenuInheritance();   // 親に設定があれば、空/未編集の子を初期表示で埋める
-      syncHomeMasterToAll();          // 1番のマスター設定を未個別編集の2〜9へ反映
 
       buildTabs();
       bindDeviceViewButtons();
@@ -1082,6 +1086,70 @@
           <span class="text-[8px] text-slate-400 font-bold ml-1">追加:</span> ${extraBtns}
         `;
 
+        document.getElementById("openMenuStudioGlobalBtn").onclick = () => {
+          openMenuButtonStudio(state.activeButtonKey || "B_home");
+        };
+
+        document.getElementById("copyBaseToSelectedBtn").onclick = openCopyBaseDialog;
+
+        document.getElementById("copyHomeOnToAllBtn").onclick = () => {
+          const homeOff = state.assets["B_home_off"];
+          if (!homeOff || (!homeOff.img && !homeOff.rawSourceImg)) {
+            alert("まずは1. ホームのOFF側をアップロードして調整してください。");
+            return;
+          }
+
+          // ★ この一括コピーの基準は「1番のOFF側」。
+          // 1番で最初に調整した大きさ・X・Yを、そのまま2〜9番の
+          // OFF/ON両方の基本配置へコピーする。
+          // ON側のエフェクト設定（ネオン・フチ等）は各ボタンのものを維持する。
+          // ただしON側の autoGen による縮小・Yずれは、OFFと同じ見た目の
+          // 大きさ/位置にするため無効化する（scaleRatio=100 / yShift=0）。
+          const baseConfig = JSON.parse(JSON.stringify(
+            homeOff.cropConfig || {scale: 100, x: 0, y: 0}
+          ));
+          let count = 0;
+
+          SECTIONS.B.items.forEach(item => {
+            if (item.id === "B_home") return;
+
+            const off = state.assets[`${item.id}_off`];
+            if (!off || (!off.img && !off.rawSourceImg)) return;
+
+            // OFF：1番OFFの大きさ・位置をそのままコピー。
+            off.cropConfig = {...baseConfig};
+
+            // ON：存在しなければ既存の自動生成経路で用意する。
+            let on = state.assets[`${item.id}_on`];
+            if (!on) {
+              applyAutoGenToItem(item.id, {
+                enabled: true, scaleRatio: 100, yShift: 0,
+                brightness: 100, saturate: 100,
+                neonEnabled: false, outlineEnabled: false,
+                pillEnabled: false, shadowEnabled: false
+              });
+              on = state.assets[`${item.id}_on`];
+            }
+
+            if (on) {
+              // ONも同じ元画像配置を使用。ON固有のエフェクトは保持する。
+              on.cropConfig = {...baseConfig};
+              on.autoGenFrom = `${item.id}_off`;
+              if (!on.autoGen) on.autoGen = {enabled: true};
+              on.autoGen.enabled = true;
+              on.autoGen.scaleRatio = 100;
+              on.autoGen.yShift = 0;
+            }
+
+            markMenuCustom(item.id);
+            count++;
+          });
+
+          renderSectionContent("B");
+          renderPreview();
+          triggerAutoSave();
+          alert(`1番OFFの大きさ・位置を、他の ${count} 個のボタンのOFF/ONへコピーしました！`);
+        };
       } else {
         quickBar.classList.add("hidden");
       }
@@ -1133,7 +1201,7 @@
             <h3 class="font-bold text-xs text-slate-800">${item.label}</h3>
           </div>
           <button type="button" class="open-single-studio-btn text-[9px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2 py-0.5 rounded shadow-2xs transition" data-id="${item.id}">
-            🎛️ OFF/ON詳細調整
+            🎛️ 専用スタジオで調整
           </button>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -1590,12 +1658,7 @@
           e.stopPropagation();
           if (opt.key.startsWith("B_")) {
             const itemId = opt.parentItemKey || opt.key.split('_').slice(0, 2).join('_');
-            const idx = parseInt(btn.dataset.idx) || 0;
-            const side = opt.isButtonOn ? "on" : "off";
-            // ONの「調整」はON専用スタジオを開く。OFFは画像の出力規格ごとの位置調整を開く。
-            // 透明画像そのもののトリミング・消しゴムは、各カード上部の専用スタジオから開ける。
-            if (opt.isButtonOn) openMenuButtonStudio(itemId, "on");
-            else openAssetAdjuster(opt.key, idx);
+            openMenuButtonStudio(itemId);
           } else if (adjGroupOf(opt.key)) {
             openAssetAdjuster(opt.key, parseInt(btn.dataset.idx) || 0);
           }
@@ -2061,9 +2124,8 @@
         const offAsset = state.assets[`${menuStudioState.currentItemId}_off`];
         if (!offAsset) return;
         offAsset.cropConfig.scale = parseInt(e.target.value);
-        markHomeMasterIndependent(menuStudioState.currentItemId, "offPlacement");
         document.getElementById("mStudioScaleVal").textContent = offAsset.cropConfig.scale + "%";
-        if (menuStudioState.currentItemId === "B_home") syncHomeMasterAfterChange(); else drawMenuStudio();
+        drawMenuStudio();
       };
 
       xRange.oninput = (e) => {
@@ -2071,9 +2133,8 @@
         const offAsset = state.assets[`${menuStudioState.currentItemId}_off`];
         if (!offAsset) return;
         offAsset.cropConfig.x = parseInt(e.target.value);
-        markHomeMasterIndependent(menuStudioState.currentItemId, "offPlacement");
         document.getElementById("mStudioXVal").textContent = offAsset.cropConfig.x + "px";
-        if (menuStudioState.currentItemId === "B_home") syncHomeMasterAfterChange(); else drawMenuStudio();
+        drawMenuStudio();
       };
 
       yRange.oninput = (e) => {
@@ -2081,9 +2142,8 @@
         const offAsset = state.assets[`${menuStudioState.currentItemId}_off`];
         if (!offAsset) return;
         offAsset.cropConfig.y = parseInt(e.target.value);
-        markHomeMasterIndependent(menuStudioState.currentItemId, "offPlacement");
         document.getElementById("mStudioYVal").textContent = offAsset.cropConfig.y + "px";
-        if (menuStudioState.currentItemId === "B_home") syncHomeMasterAfterChange(); else drawMenuStudio();
+        drawMenuStudio();
       };
 
       centerBtn.onclick = () => {
@@ -2092,7 +2152,6 @@
         if (!offAsset) return;
         offAsset.cropConfig.x = 0;
         offAsset.cropConfig.y = 0;
-        markHomeMasterIndependent(menuStudioState.currentItemId, "offPlacement");
         xRange.value = 0;
         yRange.value = 0;
         document.getElementById("mStudioXVal").textContent = "0px";
@@ -2106,7 +2165,6 @@
         if (!offAsset) return;
         offAsset.cropConfig = {scale: 100, x: 0, y: 0};
         offAsset.maskDataUrl = null;
-        markHomeMasterIndependent(menuStudioState.currentItemId, "offPlacement");
         menuStudioState.maskTouched = true;
         if (menuStudioState.maskCanvas) {
           const mCtx = menuStudioState.maskCanvas.getContext("2d");
@@ -2222,8 +2280,6 @@
         stopTapSimulation();
         ensureAgEnabled(onAsset);
         callback(onAsset.autoGen);
-        markHomeMasterIndependent(menuStudioState.currentItemId, "onEffects");
-        if (menuStudioState.currentItemId === "B_home") syncHomeMasterAfterChange();
         setStudioTab("on");
       }
 
@@ -2415,58 +2471,6 @@
     let menuInheritRunning = false;
     let menuInheritPending = false;
 
-    function masterCustomFor(itemId) {
-      if (!state.menuMasterCustom[itemId]) state.menuMasterCustom[itemId] = {};
-      return state.menuMasterCustom[itemId];
-    }
-
-    // 1番の設定を「設定値だけ」2〜9へ自動同期。素材そのものは上書きしない。
-    // カテゴリごとに子を個別編集すると、そのカテゴリだけ1番から独立する。
-    function syncHomeMasterToAll() {
-      const homeOff = state.assets["B_home_off"];
-      const homeOn = state.assets["B_home_on"];
-      if (!homeOff && !homeOn) return;
-
-      for (const it of SECTIONS.B.items) {
-        if (it.id === "B_home") continue;
-        ensureMenuButtonAssets(it.id);
-        const off = state.assets[`${it.id}_off`];
-        const on = state.assets[`${it.id}_on`];
-        const custom = masterCustomFor(it.id);
-
-        if (homeOff) {
-          if (!custom.offPlacement) off.cropConfig = JSON.parse(JSON.stringify(homeOff.cropConfig || {scale:100,x:0,y:0}));
-          if (!custom.ios26Off && homeOff.specsConfig?.[0]) off.specsConfig[0] = JSON.parse(JSON.stringify(homeOff.specsConfig[0]));
-          if (!custom.legacyOff && homeOff.specsConfig?.[1]) off.specsConfig[1] = JSON.parse(JSON.stringify(homeOff.specsConfig[1]));
-        }
-        if (homeOn && on) {
-          if (!custom.onEffects && homeOn.autoGen) {
-            on.autoGen = JSON.parse(JSON.stringify(homeOn.autoGen));
-            on.autoGenFrom = `${it.id}_off`;
-          }
-          if (!custom.ios26On && homeOn.specsConfig?.[0]) on.specsConfig[0] = JSON.parse(JSON.stringify(homeOn.specsConfig[0]));
-          if (!custom.legacyOn && homeOn.specsConfig?.[1]) on.specsConfig[1] = JSON.parse(JSON.stringify(homeOn.specsConfig[1]));
-        }
-      }
-    }
-
-    function markHomeMasterIndependent(itemId, category) {
-      if (itemId === "B_home") return;
-      const c = masterCustomFor(itemId);
-      if (c[category]) return;
-      c[category] = true;
-      triggerAutoSave();
-    }
-
-    function syncHomeMasterAfterChange() {
-      syncHomeMasterToAll();
-      if (appUiReady) {
-        renderSectionContent("B");
-        renderPreview();
-      }
-      triggerAutoSave();
-    }
-
     async function syncMenuInheritance() {
       if (menuInheritRunning) {menuInheritPending = true; return [];}
       menuInheritRunning = true;
@@ -2505,7 +2509,6 @@
         }
         triggerAutoSave();
       }
-      syncHomeMasterToAll();
       return [...changed];
     }
 
@@ -2667,7 +2670,6 @@
       // A〜Fのうち、共通の画像調整モーダルで扱えるグループを返す。
       // Bは専用スタジオ、A/C/D/E/Fはこのモーダルを使用する。
       if (key === "main") return "A";
-      if (key.startsWith("B_")) return "B";
       if (key.startsWith("pass_")) return "D";
       if (key.startsWith("profile_")) return "E";
       if (key === "talk_bg") return "F";
@@ -2676,7 +2678,6 @@
     }
 
     function adjTargetKeys(group) {
-      if (group === "B") return SECTIONS.B.items.flatMap(it => [`${it.id}_off`, `${it.id}_on`]);
       if (group === "D") return SECTIONS.D.items.flatMap(it => [`${it.id}_off`, `${it.id}_on`]);
       if (group === "A" || group === "C" || group === "E" || group === "F") return SECTIONS[group].items.map(it => it.id);
       return [];
@@ -2757,15 +2758,6 @@
         opt.specs.forEach((sp, j) => {
           if (j !== adjState.idx) a.specsConfig[j] = adjClampConf(opt, sp, a.img, src);
         });
-      }
-      if (String(cur.key).startsWith("B_")) {
-        const side = cur.key.endsWith("_on") ? "On" : "Off";
-        const cats = adjState.linked ? ["ios26" + side, "legacy" + side] : [(adjState.idx === 0 ? "ios26" : "legacy") + side];
-        if (cur.key !== "B_home_off" && cur.key !== "B_home_on") cats.forEach(c => markHomeMasterIndependent(cur.key.replace(/_(off|on)$/, ""), c));
-        if (cur.key === "B_home_off" || cur.key === "B_home_on") {
-          // 1番を編集した場合は、その出力先だけを即時マスター同期
-          syncHomeMasterToAll();
-        }
       }
       adjAfterChange();
     }
@@ -3053,11 +3045,11 @@
       }, {passive: false});
     }
 
-    function openMenuButtonStudio(itemId, initialMode = "off") {
+    function openMenuButtonStudio(itemId) {
       const modal = document.getElementById("menuStudioModal");
       modal.classList.add("active");
       modal.classList.remove("pointer-events-none");
-      loadItemIntoStudio(itemId, initialMode);
+      loadItemIntoStudio(itemId);
     }
 
     // ★ 1〜9共通: 指定ボタン自身の OFF/ON アセットを必ず用意して返す（他ボタンとは一切共有しない）
@@ -3078,7 +3070,7 @@
       return {offAsset: state.assets[`${itemId}_off`], onAsset: state.assets[`${itemId}_on`]};
     }
 
-    function loadItemIntoStudio(itemId, initialMode = "off") {
+    function loadItemIntoStudio(itemId) {
       menuStudioState.currentItemId = itemId;
       document.getElementById("menuStudioItemSelect").value = itemId;
 
@@ -3087,10 +3079,7 @@
 
       refreshStudioItemData();
       document.getElementById("mStudioModeMoveBtn").click();
-      setTimeout(() => {
-        if (initialMode === "on") document.getElementById("mStudioTabOnBtn").click();
-        else document.getElementById("mStudioTabOffBtn").click();
-      }, 0);
+      document.getElementById("mStudioTabOffBtn").click();
       drawMenuStudio();
       renderPreview();
 
@@ -4710,9 +4699,7 @@
       });
       state.menuCustom = nextCustom;
       state.menuSynced = {};
-      state.menuMasterCustom = {};
       await syncMenuInheritance();
-      syncHomeMasterToAll();
 
       renderSectionContent(state.currentTab);
       renderPreview();
@@ -4853,7 +4840,6 @@
         state.assets = {};
         state.menuCustom = {};
         state.menuSynced = {};
-        state.menuMasterCustom = {};
         studioState.sourceImg = null;
         state.talkBgColor = "#edf8fb";
         state.talkBgNone = false;
