@@ -406,6 +406,46 @@
             <button id="adjRevertBtn" type="button" class="col-span-2 bg-white hover:bg-amber-50 text-amber-800 font-bold py-1.5 rounded border border-amber-200 transition">↩ 開いた時点の状態に戻す</button>
           </div>
 
+
+          <!-- D: ON側のみ表示する「ON加工」（Bの ON編集と同じ効果。autoGen を共通利用） -->
+          <div id="adjOnFxPanel" class="hidden space-y-2 border-t pt-3">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-indigo-800">✨ ON加工</span>
+              <button id="dAgOffBtn" type="button" class="text-[10px] bg-white hover:bg-slate-100 border rounded px-2 py-0.5 font-bold text-slate-600">加工なしに戻す</button>
+            </div>
+            <div class="bg-indigo-50 border border-indigo-200 p-2 rounded text-[10px] text-indigo-900 font-semibold">💡 操作すると自動でON加工が有効になります。元画像はOFFと同じでも、ONだけ加工して出力できます。</div>
+            <div class="flex flex-wrap items-center gap-1 text-[8px] bg-white p-1.5 rounded border border-slate-200">
+              <span class="text-slate-500 font-bold block w-full mb-0.5">ワンクリック:</span>
+              <button type="button" class="d-preset-btn px-1.5 py-0.5 rounded bg-slate-100 border hover:bg-slate-200 font-bold" data-preset="press_in">🔘 ポコッと凹む</button>
+              <button type="button" class="d-preset-btn px-1.5 py-0.5 rounded bg-cyan-50 border border-cyan-300 text-cyan-800 font-bold" data-preset="neon_blue">💙 ネオン青</button>
+              <button type="button" class="d-preset-btn px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-300 text-emerald-800 font-bold" data-preset="neon_green">💚 ネオン緑</button>
+              <button type="button" class="d-preset-btn px-1.5 py-0.5 rounded bg-pink-50 border border-pink-300 text-pink-800 font-bold" data-preset="neon_pink">💖 ネオン桃</button>
+              <button type="button" class="d-preset-btn px-1.5 py-0.5 rounded bg-slate-100 border font-bold" data-preset="outline_white">⚪ 白フチ</button>
+              <button type="button" class="d-preset-btn px-1.5 py-0.5 rounded bg-amber-50 border border-amber-300 text-amber-800 font-bold" data-preset="jump_up">🚀 浮き出る</button>
+            </div>
+            <div class="grid grid-cols-2 gap-1.5 bg-white p-1.5 rounded border border-slate-200 text-[10px]">
+              <label class="block">縮小: <b id="dAgScaleVal" class="font-mono text-emerald-700">90%</b>
+                <input type="range" id="dAgScaleRange" min="70" max="115" value="90" class="w-full"></label>
+              <label class="block">上下 (Y): <b id="dAgYVal" class="font-mono text-emerald-700">0px</b>
+                <input type="range" id="dAgYRange" min="-12" max="12" value="0" class="w-full"></label>
+            </div>
+            <div class="grid grid-cols-2 gap-1.5 bg-white p-1.5 rounded border border-slate-200 text-[10px]">
+              <div class="flex items-center justify-between"><label class="flex items-center gap-1 cursor-pointer font-semibold"><input type="checkbox" id="dAgNeonToggle" class="rounded text-cyan-600"><span>背景ネオン</span></label>
+                <input type="color" id="dAgNeonPicker" value="#00ffcc" class="w-4 h-4 rounded cursor-pointer p-0 bg-transparent"></div>
+              <div class="flex items-center justify-between"><label class="flex items-center gap-1 cursor-pointer font-semibold"><input type="checkbox" id="dAgOutlineToggle" class="rounded text-emerald-600"><span>白フチ取り</span></label>
+                <input type="color" id="dAgOutlinePicker" value="#ffffff" class="w-4 h-4 rounded cursor-pointer p-0 bg-transparent"></div>
+            </div>
+            <div class="bg-white p-1.5 rounded border border-slate-200 text-[10px]">
+              <label class="block">ネオン範囲（広がり）: <b id="dAgNeonBlurVal" class="font-mono text-cyan-700">標準 (14)</b>
+                <input type="range" id="dAgNeonBlurRange" min="2" max="30" step="1" value="14" class="w-full"></label>
+            </div>
+            <div class="grid grid-cols-2 gap-1.5 bg-white p-1.5 rounded border border-slate-200 text-[10px]">
+              <div class="flex items-center justify-between"><label class="flex items-center gap-1 cursor-pointer font-semibold"><input type="checkbox" id="dAgPillToggle" class="rounded text-emerald-600"><span>円形座布団</span></label>
+                <input type="color" id="dAgPillPicker" value="#d1fae5" class="w-4 h-4 rounded cursor-pointer p-0 bg-transparent"></div>
+              <div class="flex items-center"><label class="flex items-center gap-1 cursor-pointer font-semibold"><input type="checkbox" id="dAgShadowToggle" class="rounded text-indigo-600"><span>落ち影</span></label></div>
+            </div>
+          </div>
+
           <div class="grid grid-cols-2 gap-2">
             <button id="adjPrevBtn" type="button" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-1.5 rounded border transition">◀ 前の画像</button>
             <button id="adjNextBtn" type="button" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-1.5 rounded border transition">次の画像 ▶</button>
@@ -935,11 +975,11 @@
         ]
       },
       C: {
-        id: "C", name: "メニュー背景", count: 1, sub: "1枚",
-        desc: "下部バー背景画像（1472×150px）です。元画像1枚を登録して微調整してください。横リピート配置されます。",
+        id: "C", name: "メニュー背景（任意）", count: 1, sub: "任意・1枚",
+        desc: "【任意】登録しなくても作成・出力できます。下部バー背景画像（1472×150px）です。元画像1枚を登録して微調整してください。横リピート配置されます。",
         items: [
           {
-            id: "menu_bg", label: "メニュー背景",
+            id: "menu_bg", label: "メニュー背景（任意）",
             mode: "cover",
             specs: [
               {targetKey: "common", os: "共通規格", file: "i_11.png", w: 1472, h: 150}
@@ -1488,6 +1528,7 @@
         };
       }
       const data = state.assets[opt.key];
+      const isPassOn = /^pass_\d+_on$/.test(opt.key);   // D: パスコードのON側
 
       const pairedOff = opt.pairedOffKey ? state.assets[opt.pairedOffKey] : null;
       const hasOffImage = pairedOff && (pairedOff.img || pairedOff.rawSourceImg);
@@ -1523,6 +1564,11 @@
       </div>
     `;
       }).join("");
+
+      const passOnEditHtml = isPassOn ? `
+        <button type="button" class="pass-on-edit-btn mt-1.5 w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 rounded py-1 text-[10px] font-bold transition">
+          🎛️ 編集（位置・サイズ・ON加工）
+        </button>` : "";
 
       const isRegistered = (data.img && !isAutoGenActive) || (isAutoGenActive && (hasOffImage || data.customUploaded));
 
@@ -1574,6 +1620,7 @@
       <div class="grid grid-cols-${opt.specs.length > 2 ? '3' : '2'} gap-1">
         ${specColumnsHtml}
       </div>
+      ${passOnEditHtml}
     </div>
   `;
 
@@ -1599,6 +1646,9 @@
           }
         };
       });
+
+      const passOnEditBtn = parent.querySelector(".pass-on-edit-btn");
+      if (passOnEditBtn) passOnEditBtn.onclick = (e) => {e.stopPropagation(); openAssetAdjuster(opt.key, 0);};
 
       function drawThumbCanvas() {
         if (!thumbCanvas) return;
@@ -1655,8 +1705,8 @@
             data.maskDataUrl = null;
             data.filename = file.name;
             data.filesize = `${(file.size / 1024).toFixed(1)} KB`;
-            if (opt.isButtonOn) {
-              data.customUploaded = true;
+            if (opt.isButtonOn || isPassOn) {
+              data.customUploaded = true;   // D ON の「変更」で差し替えた画像は、OFF連動ではなく独立した素材として扱う
             }
 
             if (opt.key.endsWith("_off")) {
@@ -1668,6 +1718,7 @@
                 onData.cropConfig = {scale: 100, x: 0, y: 0};
                 onData.maskDataUrl = null;
                 onData.autoGenFrom = opt.key;
+                if (opt.key.startsWith("pass_")) onData.customUploaded = false;   // D: OFFを入れ直すと、ONは再びOFFと同じ画像に連動
               }
             }
 
@@ -2668,6 +2719,54 @@
       };
     }
 
+    // D: パスコードのON側（BのON編集と同じ「ON加工」を使える画像）
+    function adjIsPassOn(key) {return /^pass_\d+_on$/.test(key || "");}
+
+    // ON加工パネルの表示切替と、現在の加工値のUI反映
+    function adjSyncFxPanel() {
+      const panel = document.getElementById("adjOnFxPanel");
+      if (!panel) return;
+      const isOn = adjIsPassOn(adjState.key);
+      panel.classList.toggle("hidden", !isOn);
+      if (!isOn) return;
+      const a = state.assets[adjState.key];
+      const ag = (a && a.autoGen) || {};
+      const $ = (id) => document.getElementById(id);
+      const act = !!ag.enabled;
+      $("dAgScaleRange").value = act ? (ag.scaleRatio || 90) : 100;
+      $("dAgScaleVal").textContent = (act ? (ag.scaleRatio || 90) : 100) + "%";
+      $("dAgYRange").value = act ? (ag.yShift || 0) : 0;
+      $("dAgYVal").textContent = (act ? (ag.yShift || 0) : 0) + "px";
+      $("dAgNeonToggle").checked = act && !!ag.neonEnabled;
+      $("dAgNeonPicker").value = ag.neonColor || "#00ffcc";
+      $("dAgNeonBlurRange").value = getNeonBlur(ag);
+      $("dAgNeonBlurVal").textContent = neonBlurLabel(getNeonBlur(ag));
+      $("dAgOutlineToggle").checked = act && !!ag.outlineEnabled;
+      $("dAgOutlinePicker").value = ag.outlineColor || "#ffffff";
+      $("dAgPillToggle").checked = act && !!ag.pillEnabled;
+      $("dAgPillPicker").value = /^#[0-9a-fA-F]{6}$/.test(ag.pillColor || "") ? ag.pillColor : "#d1fae5";
+      $("dAgShadowToggle").checked = act && !!ag.shadowEnabled;
+    }
+
+    // ON加工の変更: 自動で有効化し、描画・プレビュー・保存へ反映（Bの triggerOnEffectChange と同じ考え方）
+    function adjFxChange(callback) {
+      const key = adjState.key;
+      const a = state.assets[key];
+      if (!adjIsPassOn(key) || !a) return;
+      if (!a.autoGen) a.autoGen = defaultAutoGen();
+      if (!a.autoGen.enabled) {
+        // 加工を有効にすると、出力は「自作ON画像」でなければOFF画像を元に再描画される。
+        // 以前に差し替え済みのON画像（OFFと別のもの）は、そのまま使うよう独立扱いにしてから有効化する
+        const off = state.assets[key.replace(/_on$/, "_off")];
+        if (a.img && off && off.img && a.img.src !== off.img.src) a.customUploaded = true;
+        if (!a.autoGenFrom) a.autoGenFrom = key.replace(/_on$/, "_off");
+      }
+      ensureAgEnabled(a);
+      callback(a.autoGen);
+      adjSyncFxPanel();
+      adjAfterChange();
+    }
+
     function adjCurrent() {
       const key = adjState.key;
       const opt = assetOptRegistry[key];
@@ -2754,7 +2853,7 @@
       const cv = document.getElementById("adjMainCanvas");
       const k = Math.min(1, 360 / Math.max(spec.w, spec.h));
       const W = Math.max(1, Math.round(spec.w * k)), H = Math.max(1, Math.round(spec.h * k));
-      drawCropToCanvas(cv, a.img, W, H, conf.scale, conf.x, conf.y, opt.mode, opt.forceOpaque);
+      drawCropToCanvas(cv, a.img, W, H, conf.scale, conf.x, conf.y, opt.mode, opt.forceOpaque, adjIsPassOn(adjState.key) ? a.autoGen : undefined);
       cv.style.width = W + "px";
       cv.style.height = H + "px";
       document.getElementById("adjOutInfo").textContent = `${spec.os} ${spec.w}×${spec.h}px ／ 元画像 ${a.img.naturalWidth}×${a.img.naturalHeight}px`;
@@ -2823,6 +2922,7 @@
       if (!Array.isArray(a.specsConfig)) a.specsConfig = [];
       while (a.specsConfig.length < opt.specs.length) a.specsConfig.push({scale: 100, x: 0, y: 0});
       adjState.snapshot = JSON.parse(JSON.stringify(a.specsConfig));
+      adjState.fxSnapshot = a.autoGen ? JSON.parse(JSON.stringify(a.autoGen)) : null;
       const c = a.specsConfig;
       adjState.linked = opt.specs.length > 1 && c.every(v => v.scale === c[0].scale && v.x === c[0].x && v.y === c[0].y);
       document.getElementById("adjLinkChk").checked = adjState.linked;
@@ -2835,6 +2935,7 @@
       document.getElementById("adjTargetSelect").value = key;
       adjBuildTabs();
       adjSyncControls();
+      adjSyncFxPanel();
       adjDraw();
     }
 
@@ -2926,6 +3027,7 @@
         const cur = adjCurrent();
         if (!cur || !adjState.snapshot) return;
         cur.a.specsConfig = JSON.parse(JSON.stringify(adjState.snapshot));
+        if (adjIsPassOn(adjState.key) && adjState.fxSnapshot) {cur.a.autoGen = JSON.parse(JSON.stringify(adjState.fxSnapshot)); adjSyncFxPanel();}
         adjAfterChange();
       };
       $("adjLinkChk").onchange = (e) => {
@@ -2934,6 +3036,39 @@
           const cur = adjCurrent();
           if (cur) adjChange({...cur.conf});
         }
+      };
+      // ---- D ON: ON加工 ----
+      $("dAgScaleRange").oninput = (e) => adjFxChange(ag => {ag.scaleRatio = parseInt(e.target.value);});
+      $("dAgYRange").oninput = (e) => adjFxChange(ag => {ag.yShift = parseInt(e.target.value);});
+      $("dAgNeonToggle").onchange = (e) => adjFxChange(ag => {ag.neonEnabled = e.target.checked;});
+      $("dAgNeonPicker").oninput = (e) => adjFxChange(ag => {ag.neonColor = e.target.value;});
+      $("dAgNeonBlurRange").oninput = (e) => adjFxChange(ag => {ag.neonBlur = parseInt(e.target.value);});
+      $("dAgOutlineToggle").onchange = (e) => adjFxChange(ag => {ag.outlineEnabled = e.target.checked;});
+      $("dAgOutlinePicker").oninput = (e) => adjFxChange(ag => {ag.outlineColor = e.target.value;});
+      $("dAgPillToggle").onchange = (e) => adjFxChange(ag => {ag.pillEnabled = e.target.checked;});
+      $("dAgPillPicker").oninput = (e) => adjFxChange(ag => {ag.pillColor = e.target.value;});
+      $("dAgShadowToggle").onchange = (e) => adjFxChange(ag => {ag.shadowEnabled = e.target.checked;});
+      document.querySelectorAll(".d-preset-btn").forEach(btn => {
+        btn.onclick = () => adjFxChange(ag => {
+          const type = btn.dataset.preset;
+          Object.assign(ag, {
+            enabled: true, scaleRatio: 100, yShift: 0, brightness: 100, saturate: 100,
+            neonEnabled: false, outlineEnabled: false, pillEnabled: false, shadowEnabled: false
+          });
+          if (type === "press_in") Object.assign(ag, {scaleRatio: 90, yShift: 2, shadowEnabled: true});
+          else if (type === "neon_blue") Object.assign(ag, {scaleRatio: 92, neonEnabled: true, neonColor: "#00e5ff"});
+          else if (type === "neon_green") Object.assign(ag, {scaleRatio: 92, neonEnabled: true, neonColor: "#00ff7f"});
+          else if (type === "neon_pink") Object.assign(ag, {scaleRatio: 92, neonEnabled: true, neonColor: "#ff007f"});
+          else if (type === "outline_white") Object.assign(ag, {scaleRatio: 94, outlineEnabled: true, outlineColor: "#ffffff"});
+          else if (type === "jump_up") Object.assign(ag, {scaleRatio: 104, yShift: -4, shadowEnabled: true});
+        });
+      });
+      $("dAgOffBtn").onclick = () => {
+        const a = state.assets[adjState.key];
+        if (!adjIsPassOn(adjState.key) || !a || !a.autoGen) return;
+        a.autoGen = defaultAutoGen();   // 加工なし（enabled:false）。位置・サイズの調整値は変えない
+        adjSyncFxPanel();
+        adjAfterChange();
       };
       $("adjPrevBtn").onclick = () => adjStep(-1);
       $("adjNextBtn").onclick = () => adjStep(1);
