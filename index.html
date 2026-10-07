@@ -763,7 +763,8 @@
 
       const cleanAssets = {};
       for (const [k, v] of Object.entries(state.assets)) {
-        if (v && (v.img || v.autoGenFrom || v.rawSourceImg)) {
+        // Bボタンは画像が無くても調整値(specsConfig/autoGen)を保存する（親子同期の元値が再読込で消えないように）
+        if (v && (v.img || v.autoGenFrom || v.rawSourceImg || /^B_.+_(off|on)$/.test(k))) {
           cleanAssets[k] = {
             dataUrl: v.img ? v.img.src : null,
             rawSourceDataUrl: v.rawSourceImg ? v.rawSourceImg.src : null,
@@ -934,7 +935,7 @@
         ]
       },
       C: {
-        id: "C", name: "メニュー背景　※任意", count: 1, sub: "1枚",
+        id: "C", name: "メニュー背景", count: 1, sub: "1枚",
         desc: "下部バー背景画像（1472×150px）です。元画像1枚を登録して微調整してください。横リピート配置されます。",
         items: [
           {
@@ -2267,7 +2268,7 @@
         }
         ensureAgEnabled(onAsset);
         callback(onAsset.autoGen);
-        if (JSON.stringify(onAsset.autoGen) !== before) syncMenuMaster();
+        if (JSON.stringify(onAsset.autoGen) !== before) {syncMenuMaster(); triggerAutoSave();}
         updateStudioItemBadge();
         setStudioTab("on");
       }
@@ -2394,6 +2395,7 @@
       off.specsConfig[idx] = next;
       if (!on.customUploaded) on.specsConfig[idx] = {...next};
       syncMenuMaster();   // 1番→2,3,6,8 / 3→4 / 6→5,7 / 8→9 と順に反映
+      triggerAutoSave();  // 調整値の変更を保存（子へ反映した値も一緒に保存される）
       return true;
     }
 
@@ -2405,9 +2407,8 @@
 
     // 個別編集していない系統だけ、追従元の調整値へ揃える（何度呼んでも同じ結果）。変更があれば true
     function syncMenuMaster() {
-      const mOff = state.assets[`${B_MASTER_ID}_off`];
-      if (!mOff) return false;
-      const {onAsset: mOn} = ensureMenuButtonAssets(B_MASTER_ID);
+      // 1番のアセットが未作成でも同期を止めない（3→4 / 6→5,7 / 8→9 は1番の有無と無関係に連鎖させる）
+      const {offAsset: mOff, onAsset: mOn} = ensureMenuButtonAssets(B_MASTER_ID);
       let changed = false;
       const same = (a, b) => a && b && a.scale === b.scale && a.x === b.x && a.y === b.y;
       const put = (asset, idx, c) => {
