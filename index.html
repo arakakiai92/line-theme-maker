@@ -36,6 +36,32 @@
     .preview-sticky {
       position: sticky;
       top: 62px;
+      /* 画面の高さに収める（収まらない場合のみ、プレビュー内だけでスクロール） */
+      max-height: calc(100vh - 74px);
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    /* D/E/F 調整モーダル（PC・タブレット幅）: 左=出力プレビューを固定、右=調整パネルだけをスクロール */
+    @media (min-width: 768px) {
+      #assetAdjustModal .adj-body {
+        overflow: hidden;
+        min-height: 0;
+        grid-template-rows: minmax(0, 1fr);
+      }
+
+      #assetAdjustModal .adj-left,
+      #assetAdjustModal .adj-right {
+        min-height: 0;
+        max-height: 100%;
+        overflow-y: auto;
+        overflow-x: hidden;
+        overscroll-behavior: contain;
+      }
+
+      #assetAdjustModal .adj-right {
+        padding-right: 4px;
+      }
     }
 
     .panel-scroll {
@@ -339,9 +365,9 @@
         </div>
       </div>
 
-      <div class="flex-1 overflow-y-auto p-3 md:p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="adj-body flex-1 overflow-y-auto p-3 md:p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
         <!-- 左: 出力イメージ -->
-        <div class="space-y-2">
+        <div class="adj-left space-y-2">
           <div class="flex items-center justify-between text-[10px]">
             <span class="font-bold text-slate-700">出力イメージ（ZIPに入る画像）</span>
             <span id="adjOutInfo" class="font-mono text-slate-500">-</span>
@@ -367,7 +393,7 @@
         </div>
 
         <!-- 右: 調整 -->
-        <div class="space-y-3 text-xs">
+        <div class="adj-right space-y-3 text-xs">
           <div>
             <span class="text-[10px] font-bold text-slate-500 block mb-1">調整する出力</span>
             <div id="adjSpecTabs" class="flex gap-1"></div>
@@ -740,6 +766,9 @@
 
           <!-- ナビゲーション ＆ 完了ボタン -->
           <div class="pt-3 border-t border-slate-200 space-y-2">
+            <button id="mStudioRevertBtn" type="button"
+              class="w-full bg-white hover:bg-amber-50 text-amber-800 font-bold py-1.5 rounded-lg border border-amber-200 transition text-xs"
+              title="この調整画面を開いてから行った変更（位置・サイズ・ON加工など）をすべて取り消します">↩️ 開いた時点に戻す</button>
             <div class="flex items-center justify-between gap-2 text-xs">
               <button id="mStudioPrevItemBtn"
                 class="flex-1 bg-white hover:bg-slate-100 text-slate-700 font-bold py-1.5 rounded-lg border transition">◀
@@ -2007,6 +2036,7 @@
         triggerAutoSave();
       }
       closeBtn.onclick = closeStudio;
+      document.getElementById("mStudioRevertBtn").onclick = revertMenuStudioToOpened;
       saveBtn.onclick = closeStudio;
 
       function setStudioViewMode(mode) {
@@ -3119,9 +3149,61 @@
     // ★ 開く対象(itemId)と状態(mode: "off"|"on")・出力規格(device: "legacy"|"ios26")を呼び出し元が明示する
     function openMenuButtonStudio(itemId, mode, device) {
       const modal = document.getElementById("menuStudioModal");
+      if (!modal.classList.contains("active")) takeMenuStudioOpenSnapshot();   // 開いた瞬間の状態を一時保存
       modal.classList.add("active");
       modal.classList.remove("pointer-events-none");
       loadItemIntoStudio(itemId, mode, device);
+    }
+
+    // ★ 「開いた時点に戻す」用: 調整画面を開いた瞬間の調整値(B全ボタン分)を一時保存する。
+    //   対象は位置/サイズ(specsConfig)・ON加工(autoGen)・追従/個別編集フラグ(legacy/ios26/fx)。画像そのものは対象外。
+    //   親(3,6,8)の調整は子(4,5,7,9)へ波及するため、現在のボタンだけでなく全ボタン分を保持する。
+    let menuStudioOpenSnap = null;
+    function takeMenuStudioOpenSnapshot() {
+      const clone = (v) => JSON.parse(JSON.stringify(v));
+      const snap = {items: {}, indep: {}};
+      SECTIONS.B.items.forEach(it => {
+        const {offAsset, onAsset} = ensureMenuButtonAssets(it.id);
+        snap.items[it.id] = {offSpecs: clone(offAsset.specsConfig), onSpecs: clone(onAsset.specsConfig), autoGen: clone(onAsset.autoGen)};
+        const f = state.menuIndep[it.id];
+        if (f) snap.indep[it.id] = {legacy: !!f.legacy, ios26: !!f.ios26, fx: !!f.fx};
+      });
+      menuStudioOpenSnap = snap;
+    }
+
+    function revertMenuStudioToOpened() {
+      const snap = menuStudioOpenSnap;
+      if (!snap) return;
+      const clone = (v) => JSON.parse(JSON.stringify(v));
+      if (menuStudioState.tapSimInterval) {clearInterval(menuStudioState.tapSimInterval); menuStudioState.tapSimInterval = null;}
+      const tapChk = document.getElementById("mStudioTapSimToggle");
+      if (tapChk) tapChk.checked = false;
+
+      SECTIONS.B.items.forEach(it => {
+        const sn = snap.items[it.id];
+        if (!sn) return;
+        const {offAsset, onAsset} = ensureMenuButtonAssets(it.id);
+        offAsset.specsConfig = clone(sn.offSpecs);
+        onAsset.specsConfig = clone(sn.onSpecs);
+        onAsset.autoGen = clone(sn.autoGen);
+        // 追従/個別編集フラグも「開いた時点」の値へ（この画面での編集で切り替わった分だけが元に戻る。img フラグは触らない）
+        const sf = snap.indep[it.id] || {};
+        const cf = state.menuIndep[it.id];
+        if (cf || snap.indep[it.id]) {
+          const f = cf || (state.menuIndep[it.id] = {legacy: false, ios26: false, fx: false, img: false});
+          f.legacy = !!sf.legacy; f.ios26 = !!sf.ios26; f.fx = !!sf.fx;
+        }
+      });
+
+      // 保存前の消しゴム作業(未確定)は破棄
+      menuStudioState.workCanvas = null;
+      menuStudioState.workItemId = null;
+      menuStudioState.erased = false;
+
+      refreshStudioItemData();
+      renderSectionContent("B");
+      renderPreview();
+      triggerAutoSave();   // 既存の同期＋自動保存（復元後の状態が現在の設定として保存される）
     }
 
     // 1〜9共通: 指定ボタン自身の OFF/ON アセットを必ず用意して返す（ON効果の有効化はしない）
