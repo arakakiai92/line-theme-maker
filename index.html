@@ -196,20 +196,6 @@
             <span class="text-slate-500 font-bold whitespace-nowrap">ジャンプ:</span>
             <div id="jumpButtons" class="flex items-center gap-1"></div>
           </div>
-          <div class="flex items-center gap-1">
-            <button id="openMenuStudioGlobalBtn"
-              class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2 py-1 rounded shadow-xs whitespace-nowrap transition flex items-center gap-1">
-              <span>🎛️ 専用スタジオでON/OFF確認</span>
-            </button>
-            <button id="copyHomeOnToAllBtn"
-              class="bg-slate-800 hover:bg-black text-white font-bold px-2 py-1 rounded shadow-xs whitespace-nowrap transition flex items-center gap-1">
-              <span>⚡ 1番の設定を全ON/OFFへコピー</span>
-            </button>
-            <button id="copyBaseToSelectedBtn" type="button"
-              class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-2 py-1 rounded shadow-xs whitespace-nowrap transition flex items-center gap-1">
-              <span>📋 1番をベースにコピー</span>
-            </button>
-          </div>
         </div>
 
         <div class="panel-scroll p-2.5 md:p-3 space-y-3" id="assetList"></div>
@@ -491,22 +477,34 @@
       <!-- メイン作業エリア -->
       <div class="flex-1 overflow-y-auto p-4 grid md:grid-cols-[1fr_310px] gap-5 items-start">
         <div class="flex flex-col items-center justify-center">
-          <div
-            class="relative bg-slate-900 checker-bg rounded-2xl overflow-hidden border-2 border-emerald-500 shadow-inner flex items-center justify-center w-[300px] h-[300px] cursor-grab select-none touch-none"
-            id="mStudioCanvasWrapper">
-            <canvas id="mStudioMainCanvas" class="w-full h-full object-contain pointer-events-none"></canvas>
-            <div id="mStudioGuideOverlay" class="absolute inset-0 pointer-events-none flex items-center justify-center">
-              <div class="w-full h-[1px] bg-emerald-500/40 absolute"></div>
-              <div class="h-full w-[1px] bg-emerald-500/40 absolute"></div>
-              <div class="border border-dashed border-emerald-400/80 rounded absolute inset-1 pointer-events-none">
-              </div>
-              <span id="mStudioModeBadge"
-                class="absolute bottom-2 right-2 text-[10px] text-white bg-emerald-600/90 px-1.5 py-0.5 rounded font-bold">🔘
-                OFF 編集枠</span>
+          <!-- 編集キャンバス = LINEに実際に出力されるサイズ（表示だけ拡大） -->
+          <div class="w-full max-w-[340px] mb-2">
+            <div class="flex bg-slate-200 p-0.5 rounded-lg text-xs">
+              <button id="mStudioDevLegacyBtn" type="button"
+                class="flex-1 py-1.5 rounded-md font-bold transition bg-white text-slate-900 shadow-xs">従来 / Android<span
+                  class="block text-[9px] font-mono font-normal">128×150px</span></button>
+              <button id="mStudioDevIosBtn" type="button"
+                class="flex-1 py-1.5 rounded-md font-bold transition text-slate-600 hover:text-slate-900">iOS 26<span
+                  class="block text-[9px] font-mono font-normal">80×56px</span></button>
             </div>
+            <p id="mStudioOutInfo" class="text-[10px] text-slate-500 mt-1 text-center font-mono">編集キャンバス = LINE出力 128×150px</p>
+          </div>
+          <div
+            class="relative checker-bg rounded-md overflow-hidden border-2 border-emerald-500 shadow-inner cursor-grab select-none touch-none"
+            id="mStudioCanvasWrapper" style="width:307px;height:360px;">
+            <canvas id="mStudioMainCanvas" class="pointer-events-none" style="display:block;width:100%;height:100%;"></canvas>
+            <div id="mStudioGuideOverlay" class="absolute inset-0 pointer-events-none">
+              <div class="absolute top-0 bottom-0 left-1/2 w-[1px] bg-emerald-500/40"></div>
+              <div class="absolute left-0 right-0 border-t border-dashed border-emerald-500/70" style="bottom:2%"></div>
+              <span id="mStudioModeBadge"
+                class="absolute top-1 right-1 text-[10px] text-white bg-emerald-600/90 px-1.5 py-0.5 rounded font-bold">🔘 OFF 編集枠</span>
+            </div>
+            <div id="mStudioEmptyMsg"
+              class="hidden absolute inset-0 flex items-center justify-center text-[11px] text-slate-500 text-center p-3 pointer-events-none bg-white/70">
+              画像がまだ登録されていません。先にアップロードしてください。</div>
           </div>
           <p id="mStudioInstruction" class="text-[11px] text-slate-500 mt-2 text-center">
-            💡 画像を<b>ドラッグして移動</b> / <b>ホイールで拡大縮小 (最大1000%)</b>
+            💡 画像を<b>ドラッグして移動</b> / <b>ホイールで拡大縮小</b>（出力サイズのキャンバス上で調整）
           </p>
 
           <!-- 下部: iOS 26 / Android 規格プレビュー -->
@@ -536,6 +534,8 @@
         <!-- 右: 調整タブ -->
         <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 flex flex-col justify-between h-full">
           <div>
+            <div id="mStudioSyncInfo"
+              class="text-[10px] leading-snug bg-white border border-slate-200 rounded-lg p-2 mb-3 text-slate-600"></div>
             <div class="flex border-b border-slate-200 mb-3 text-xs font-bold">
               <button id="mStudioTabOffBtn"
                 class="flex-1 py-1.5 border-b-2 border-emerald-600 text-emerald-800 text-center">🔘 OFF
@@ -563,6 +563,9 @@
                   data-size="24">中 (24)</button>
                 <button class="m-eraser-btn px-2 py-0.5 rounded border border-slate-300 bg-white font-bold text-[10px]"
                   data-size="44">太 (44)</button>
+                <button id="mStudioEraserUndoBtn" type="button"
+                  class="px-2 py-0.5 rounded border border-amber-300 bg-amber-50 text-amber-800 font-bold text-[10px]"
+                  title="消した部分をすべて元に戻します">↩ 消去を戻す</button>
               </div>
 
               <div>
@@ -571,25 +574,25 @@
                   <span id="mStudioScaleVal"
                     class="font-mono font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded text-[11px]">100%</span>
                 </div>
-                <input type="range" id="mStudioScaleRange" min="10" max="1000" value="100" class="w-full">
+                <input type="range" id="mStudioScaleRange" min="10" max="1000" step="1" value="100" class="w-full">
               </div>
 
               <div>
                 <div class="flex items-center justify-between mb-1 text-xs">
                   <span class="font-bold text-slate-700">↔️ 水平位置 (X)</span>
                   <span id="mStudioXVal"
-                    class="font-mono font-bold text-slate-800 bg-white border px-2 py-0.5 rounded text-[11px]">0px</span>
+                    class="font-mono font-bold text-slate-800 bg-white border px-2 py-0.5 rounded text-[11px]">0%</span>
                 </div>
-                <input type="range" id="mStudioXRange" min="-800" max="800" value="0" class="w-full">
+                <input type="range" id="mStudioXRange" min="-150" max="150" step="0.5" value="0" class="w-full">
               </div>
 
               <div>
                 <div class="flex items-center justify-between mb-1 text-xs">
                   <span class="font-bold text-slate-700">↕️ 垂直位置 (Y)</span>
                   <span id="mStudioYVal"
-                    class="font-mono font-bold text-slate-800 bg-white border px-2 py-0.5 rounded text-[11px]">0px</span>
+                    class="font-mono font-bold text-slate-800 bg-white border px-2 py-0.5 rounded text-[11px]">0%</span>
                 </div>
-                <input type="range" id="mStudioYRange" min="-800" max="800" value="0" class="w-full">
+                <input type="range" id="mStudioYRange" min="-150" max="150" step="0.5" value="0" class="w-full">
               </div>
 
               <div class="pt-1 grid grid-cols-2 gap-2 text-xs">
@@ -601,7 +604,7 @@
                   初期化</button>
                 <button id="mStudioAutoFitBtn" type="button"
                   class="col-span-2 bg-white hover:bg-emerald-50 text-emerald-800 font-bold py-1.5 rounded border border-emerald-200 transition"
-                  title="拡大率は変えず、実際に描かれている範囲の中央・下端だけを揃えます">📐 中央・下端に配置（サイズは変えません）</button>
+                  title="拡大率は変えず、この出力キャンバス上で、実際に描かれている範囲の中央・下端だけを揃えます">📐 中央・下端に配置（サイズは変えません）</button>
               </div>
             </div>
 
@@ -788,9 +791,9 @@
         currentDevice: state.currentDevice,
         talkBgColor: state.talkBgColor,
         talkBgNone: !!state.talkBgNone,
-        menuInheritOwn: state.menuOwn,
         studioSourceDataUrl: studioState.sourceImg ? studioState.sourceImg.src : null,
-        menuInheritCustom: state.menuCustom,
+        menuIndep: state.menuIndep,
+        menuIndepVer: 2,   // 2 = 変種関係(3=4,6=5=7,8=9)＋1番マスター同期に対応した保存形式
         assets: cleanAssets
       });
 
@@ -863,22 +866,15 @@
             if (on && on.autoGenFrom && on.autoGenFrom !== `${it.id}_off`) on.autoGenFrom = `${it.id}_off`;
           });
 
-          // 子ボタンの「個別編集済み」状態を復元。旧データ(項目なし)は既存の中身を守るため個別編集済み扱いにする
-          if (data.menuInheritCustom && typeof data.menuInheritCustom === "object") {
-            state.menuCustom = {...data.menuInheritCustom};
-          } else {
-            state.menuCustom = {};
+          // B: 1番マスターに追従しない「個別編集済み」フラグを復元
+          state.menuIndep = (data.menuIndep && typeof data.menuIndep === "object") ? data.menuIndep : {};
+          // すでに自分の画像を持つ子(4,5,7,9)は、素材を守るため画像は独立扱いにする（空の子だけ親から引き継ぐ）
+          if (data.menuIndepVer !== 2) {
             SECTIONS.B.items.forEach(it => {
-              if (it.inheritFrom && menuButtonHasContent(it.id)) state.menuCustom[it.id] = true;
-            });
-          }
-          if (data.menuInheritOwn && typeof data.menuInheritOwn === "object") {
-            state.menuOwn = {...data.menuInheritOwn};
-          } else {
-            // 旧データ: 個別編集済みで中身のある子は、素材を守るため「自分の素材あり」とみなす
-            state.menuOwn = {};
-            SECTIONS.B.items.forEach(it => {
-              if (it.inheritFrom && state.menuCustom[it.id] && menuButtonHasContent(it.id)) state.menuOwn[it.id] = true;
+              const a = state.assets[`${it.id}_off`];
+              if (it.inheritFrom && a && a.img) {
+                state.menuIndep[it.id] = {legacy: false, ios26: false, fx: false, ...(state.menuIndep[it.id] || {}), img: true};
+              }
             });
           }
           resolve(true);
@@ -897,7 +893,8 @@
     function triggerAutoSave() {
       clearTimeout(saveTimeout);
       saveTimeout = setTimeout(saveToDB, 600);
-      setTimeout(() => {syncMenuInheritance();}, 0);   // 親の変更を未編集の子へ継承
+      syncMenuMaster();   // 1番マスター / 親(3,6,8)の変更を、個別編集していない項目へ反映
+      syncMenuImages();   // 親の画像を、独立していない子(4,5,7,9)へ複製
     }
 
     // =========================================================================
@@ -1006,9 +1003,7 @@
       talkBgColor: "#edf8fb",
       assets: {},
       talkBgNone: false, // F: 背景なし（透過）を選択中か（画像・調整値は保持したまま切り替え）
-      menuOwn: {},      // 子ボタンIDごとの「自分の素材(アップロード/コピー)を持つ」フラグ（保存対象）
-      menuCustom: {},   // 子ボタンIDごとの「個別編集済み」フラグ（保存対象）
-      menuSynced: {}    // 子ボタンIDごとの「最後に継承した親の状態シグネチャ」（メモリのみ）
+      menuIndep: {}     // B: 項目ID → {legacy, ios26, fx} 個別編集済み（1番マスターに追従しない）フラグ（保存対象）
     };
     let appUiReady = false;
 
@@ -1018,7 +1013,8 @@
     async function init() {
       await initDB();
       const restored = await loadFromDB();
-      await syncMenuInheritance();   // 親に設定があれば、空/未編集の子を初期表示で埋める
+      syncMenuMaster();   // 1番マスターの設定を、個別編集していない項目へ反映
+      await syncMenuImages();   // 親に画像があれば、空の子(4,5,7,9)を初期表示で埋める
 
       buildTabs();
       bindDeviceViewButtons();
@@ -1086,70 +1082,6 @@
           <span class="text-[8px] text-slate-400 font-bold ml-1">追加:</span> ${extraBtns}
         `;
 
-        document.getElementById("openMenuStudioGlobalBtn").onclick = () => {
-          openMenuButtonStudio(state.activeButtonKey || "B_home");
-        };
-
-        document.getElementById("copyBaseToSelectedBtn").onclick = openCopyBaseDialog;
-
-        document.getElementById("copyHomeOnToAllBtn").onclick = () => {
-          const homeOff = state.assets["B_home_off"];
-          if (!homeOff || (!homeOff.img && !homeOff.rawSourceImg)) {
-            alert("まずは1. ホームのOFF側をアップロードして調整してください。");
-            return;
-          }
-
-          // ★ この一括コピーの基準は「1番のOFF側」。
-          // 1番で最初に調整した大きさ・X・Yを、そのまま2〜9番の
-          // OFF/ON両方の基本配置へコピーする。
-          // ON側のエフェクト設定（ネオン・フチ等）は各ボタンのものを維持する。
-          // ただしON側の autoGen による縮小・Yずれは、OFFと同じ見た目の
-          // 大きさ/位置にするため無効化する（scaleRatio=100 / yShift=0）。
-          const baseConfig = JSON.parse(JSON.stringify(
-            homeOff.cropConfig || {scale: 100, x: 0, y: 0}
-          ));
-          let count = 0;
-
-          SECTIONS.B.items.forEach(item => {
-            if (item.id === "B_home") return;
-
-            const off = state.assets[`${item.id}_off`];
-            if (!off || (!off.img && !off.rawSourceImg)) return;
-
-            // OFF：1番OFFの大きさ・位置をそのままコピー。
-            off.cropConfig = {...baseConfig};
-
-            // ON：存在しなければ既存の自動生成経路で用意する。
-            let on = state.assets[`${item.id}_on`];
-            if (!on) {
-              applyAutoGenToItem(item.id, {
-                enabled: true, scaleRatio: 100, yShift: 0,
-                brightness: 100, saturate: 100,
-                neonEnabled: false, outlineEnabled: false,
-                pillEnabled: false, shadowEnabled: false
-              });
-              on = state.assets[`${item.id}_on`];
-            }
-
-            if (on) {
-              // ONも同じ元画像配置を使用。ON固有のエフェクトは保持する。
-              on.cropConfig = {...baseConfig};
-              on.autoGenFrom = `${item.id}_off`;
-              if (!on.autoGen) on.autoGen = {enabled: true};
-              on.autoGen.enabled = true;
-              on.autoGen.scaleRatio = 100;
-              on.autoGen.yShift = 0;
-            }
-
-            markMenuCustom(item.id);
-            count++;
-          });
-
-          renderSectionContent("B");
-          renderPreview();
-          triggerAutoSave();
-          alert(`1番OFFの大きさ・位置を、他の ${count} 個のボタンのOFF/ONへコピーしました！`);
-        };
       } else {
         quickBar.classList.add("hidden");
       }
@@ -1212,7 +1144,7 @@
           container.appendChild(row);
 
           row.querySelector(".open-single-studio-btn").onclick = () => {
-            openMenuButtonStudio(item.id);
+            openMenuButtonStudio(item.id, "off", "legacy");
           };
 
           createCompactUploader(row.querySelector(`#box_${item.id}_off`), {
@@ -1658,7 +1590,9 @@
           e.stopPropagation();
           if (opt.key.startsWith("B_")) {
             const itemId = opt.parentItemKey || opt.key.split('_').slice(0, 2).join('_');
-            openMenuButtonStudio(itemId);
+            // ON画像の「調整」ならON編集、OFF画像ならOFF編集。押した出力規格(iOS 26 / 従来)もそのまま渡す
+            const spec = opt.specs[parseInt(btn.dataset.idx) || 0];
+            openMenuButtonStudio(itemId, opt.key.endsWith("_on") ? "on" : "off", spec && spec.targetKey === "ios26" ? "ios26" : "legacy");
           } else if (adjGroupOf(opt.key)) {
             openAssetAdjuster(opt.key, parseInt(btn.dataset.idx) || 0);
           }
@@ -1700,7 +1634,7 @@
           data.rawSourceImg = null;
           data.customUploaded = false;
           data.filename = "";
-          if (opt.parentItemKey) markMenuCustom(opt.parentItemKey);
+          markMenuImgIndep(opt.parentItemKey);
           renderSectionContent(state.currentTab);
           renderPreview();
           triggerAutoSave();
@@ -1713,7 +1647,7 @@
         reader.onload = (e) => {
           const img = new Image();
           img.onload = () => {
-            if (opt.parentItemKey) {markMenuCustom(opt.parentItemKey); markMenuOwn(opt.parentItemKey);}   // 子に直接アップロード = 個別編集＋自分の素材
+            markMenuImgIndep(opt.parentItemKey);   // 子に直接アップロード = その子の画像は独立
             data.rawSourceImg = img;
             data.img = img;
             data.cropConfig = {scale: 100, x: 0, y: 0};
@@ -1745,7 +1679,6 @@
                   if (on) {
                     on.img = data.img;
                     on.cropConfig = {...data.cropConfig};
-                    on.specsConfig = data.specsConfig.map(c => ({...c}));
                   }
                 }
                 renderSectionContent(state.currentTab);
@@ -1807,42 +1740,23 @@
     // =========================================================================
     const menuStudioState = {
       currentItemId: "B_home",
-      viewMode: "off",
+      viewMode: "off",        // 表示・編集中の状態: "off" | "on"
+      device: "legacy",       // 編集キャンバスの出力規格: "legacy"(従来/Android 128×150) | "ios26"(80×56)
       editMode: "move",
       bgMode: "checker",
       eraserRadius: 24,
-      maskCanvas: null,
+      workCanvas: null,       // 消しゴム用の作業キャンバス（元画像と同じ座標系）
+      workItemId: null,
+      erased: false,
       tapSimInterval: null,
       isInteracting: false,
       dragStartX: 0,
       dragStartY: 0,
       startConfX: 0,
-      startConfY: 0
+      startConfY: 0,
+      startAgY: 0,
+      api: null
     };
-
-    // ★ 現在のOFF位置・消しゴムから「切り抜かれたキャラ単体」の一時Canvasを生成
-    function getStudioCroppedCharacterCanvas() {
-      const offAsset = state.assets[`${menuStudioState.currentItemId}_off`];
-      if (!offAsset) return null;
-      const sourceImg = offAsset.rawSourceImg || offAsset.img;
-      if (!sourceImg) return null;
-
-      const tempCv = document.createElement("canvas");
-      tempCv.width = 300;
-      tempCv.height = 300;
-      const ctx = tempCv.getContext("2d");
-
-      const conf = offAsset.cropConfig || {scale: 100, x: 0, y: 0};
-      drawCropToCanvas(tempCv, sourceImg, 300, 300, conf.scale, conf.x, conf.y, "contain", false);
-
-      if (menuStudioState.maskCanvas) {
-        ctx.save();
-        ctx.globalCompositeOperation = "destination-out";
-        ctx.drawImage(menuStudioState.maskCanvas, 0, 0);
-        ctx.restore();
-      }
-      return tempCv;
-    }
 
     // ★ キャラクター単体に対してエフェクト（縮小・ネオン・フチ等）をダイレクト適用して描画
     function renderCharacterWithEffects(ctx, charImg, w, h, ag) {
@@ -1958,18 +1872,50 @@
       const centerBtn = document.getElementById("mStudioCenterBtn");
       const resetBtn = document.getElementById("mStudioResetBtn");
 
+      const devLegacyBtn = document.getElementById("mStudioDevLegacyBtn");
+      const devIosBtn = document.getElementById("mStudioDevIosBtn");
+      const outInfo = document.getElementById("mStudioOutInfo");
+      const eraserUndoBtn = document.getElementById("mStudioEraserUndoBtn");
+
+      // ★ 出力規格の切替。編集キャンバスは常に「LINEへ実際に出力されるサイズ」の縦横比
+      //   （元画像400×400は素材であり、編集の基準枠ではない。画面上は拡大表示しているだけ）
+      function setStudioDevice(dev) {
+        menuStudioState.device = (dev === "ios26") ? "ios26" : "legacy";
+        const o = B_OUTPUT[menuStudioState.device];
+        const isLegacy = menuStudioState.device === "legacy";
+        devLegacyBtn.className = `flex-1 py-1.5 rounded-md font-bold transition ${isLegacy ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"}`;
+        devIosBtn.className = `flex-1 py-1.5 rounded-md font-bold transition ${!isLegacy ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"}`;
+        canvasWrapper.style.width = Math.round(o.w * o.zoom) + "px";
+        canvasWrapper.style.height = Math.round(o.h * o.zoom) + "px";
+        outInfo.textContent = `編集キャンバス = LINE出力 ${o.w}×${o.h}px（画面上は ×${o.zoom} に拡大表示）`;
+        syncStudioSliders();
+        updateStudioItemBadge();
+        drawMenuStudio();
+      }
+
+      devLegacyBtn.onclick = () => {stopTapSimulation(); setStudioDevice("legacy");};
+      devIosBtn.onclick = () => {stopTapSimulation(); setStudioDevice("ios26");};
+
+      // OFF側の位置・拡大を、現在の出力規格の specsConfig に反映（ONは常にOFFと同じ配置）
+      function applyOffConf(patch) {
+        const o = B_OUTPUT[menuStudioState.device];
+        setMenuOffConf(menuStudioState.currentItemId, o.idx, patch);
+        syncStudioSliders();
+        updateStudioItemBadge();
+        drawMenuStudio();
+      }
+
       document.getElementById("mStudioAutoFitBtn").onclick = () => {
         ensureOffEditing();
-        const offAsset = state.assets[`${menuStudioState.currentItemId}_off`];
-        const raw = offAsset && (offAsset.rawSourceImg || offAsset.img);
-        const conf = raw ? computeBAutoCropConfig(raw, offAsset.cropConfig ? offAsset.cropConfig.scale : 100) : null;
+        const id = menuStudioState.currentItemId;
+        const o = B_OUTPUT[menuStudioState.device];
+        const src = getMenuOffSource(id);
+        const conf = src ? computeMenuAutoPlacement(src, o, menuConfOf(state.assets[`${id}_off`], o.idx).scale) : null;
         if (!conf) {
-          alert("自動で配置できるのは、透明な余白を含むPNG画像を登録しているときです。\n（背景が不透明な画像は、そのまま手動で調整してください）");
+          alert("透明な余白を含むPNG画像を登録しているときに使えます。\n（背景が不透明な画像は、そのまま手動で調整してください）");
           return;
         }
-        offAsset.cropConfig = conf;   // 拡大率はそのまま。X位置と下端位置だけを調整
-        syncStudioSliders();
-        drawMenuStudio();
+        applyOffConf({x: conf.x, y: conf.y});   // 拡大率は変更しない
       };
 
       const prevItemBtn = document.getElementById("mStudioPrevItemBtn");
@@ -1979,6 +1925,7 @@
         <option value="${it.id}">${it.label}</option>
       `).join("");
 
+      // 画像の移動時は、表示中のOFF/ON・出力規格をそのまま引き継ぐ
       itemSelect.onchange = () => {
         saveCurrentStudioItem();
         loadItemIntoStudio(itemSelect.value);
@@ -1998,8 +1945,7 @@
         loadItemIntoStudio(SECTIONS.B.items[nextIdx].id);
       };
 
-      // ✕ も保存と同じ扱い（スライダー等は state を直接更新するため、画像の確定と食い違わないようにする）
-      closeBtn.onclick = () => {
+      function closeStudio() {
         saveCurrentStudioItem();
         stopTapSimulation();
         modal.classList.remove("active");
@@ -2007,17 +1953,9 @@
         renderSectionContent("B");
         renderPreview();
         triggerAutoSave();
-      };
-
-      saveBtn.onclick = () => {
-        saveCurrentStudioItem();
-        stopTapSimulation();
-        modal.classList.remove("active");
-        modal.classList.add("pointer-events-none");
-        renderSectionContent("B");
-        renderPreview();
-        triggerAutoSave();
-      };
+      }
+      closeBtn.onclick = closeStudio;
+      saveBtn.onclick = closeStudio;
 
       function setStudioViewMode(mode) {
         menuStudioState.viewMode = mode;
@@ -2026,16 +1964,24 @@
         viewOffBtn.className = `px-3 py-1 rounded-md font-bold transition ${isOff ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`;
         viewOnBtn.className = `px-3 py-1 rounded-md font-bold transition ${!isOff ? 'bg-white text-emerald-800 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`;
 
-        document.getElementById("mStudioModeBadge").textContent = isOff ? "🔘 OFF 編集枠" : "✨ ON プレビュー枠";
-        document.getElementById("mStudioModeBadge").className = `absolute bottom-2 right-2 text-[10px] text-white px-1.5 py-0.5 rounded font-bold ${isOff ? 'bg-emerald-600/90' : 'bg-indigo-600/90'}`;
+        document.getElementById("mStudioModeBadge").textContent = isOff ? "🔘 OFF 編集枠" : "✨ ON 編集枠";
+        document.getElementById("mStudioModeBadge").className = `absolute top-1 right-1 text-[10px] text-white px-1.5 py-0.5 rounded font-bold ${isOff ? 'bg-emerald-600/90' : 'bg-indigo-600/90'}`;
 
         document.getElementById("mStudioCurrentStateTag").textContent = isOff ? "OFF表示中" : "ON表示中";
         document.getElementById("mStudioCurrentStateTag").className = `text-[8px] font-bold px-1.5 py-0.2 rounded font-mono ${isOff ? 'bg-emerald-100 text-emerald-800' : 'bg-indigo-100 text-indigo-800'}`;
+
+        const ins = document.getElementById("mStudioInstruction");
+        if (menuStudioState.editMode !== "eraser" || !isOff) {
+          ins.innerHTML = isOff
+            ? "💡 画像を<b>ドラッグして移動</b> / <b>ホイールで拡大縮小</b>（出力サイズのキャンバス上で調整）"
+            : "💡 <b>上下ドラッグ</b>でONの上下位置 / <b>ホイール</b>でONの縮小率（出力サイズのキャンバス上で調整）";
+        }
 
         drawMenuStudio();
       }
 
       // ★ OFF/ON の「タブ」と「表示状態(viewMode)」を常に一致させる共通関数（1〜9共通）
+      //   呼び出し元(OFFの調整ボタン/ONの調整ボタン)が指定した状態でそのまま開く。勝手にOFFへ戻さない。
       function setStudioTab(mode) {
         const isOff = (mode === "off");
         tabOffBtn.className = isOff
@@ -2047,13 +1993,20 @@
         panelOff.classList.toggle("hidden", !isOff);
         panelOn.classList.toggle("hidden", isOff);
         if (!isOff) {
-          const onAsset = state.assets[`${menuStudioState.currentItemId}_on`];
-          if (onAsset) ensureAgEnabled(onAsset);
+          const id = menuStudioState.currentItemId;
+          const onAsset = state.assets[`${id}_on`];
+          const flags = state.menuIndep[id] || {};
+          // マスター(1番)か、ON加工を個別編集済みの項目だけ効果を有効化。追従中の項目は1番の状態をそのまま表示
+          if (onAsset && (id === B_MASTER_ID || flags.fx)) {
+            ensureAgEnabled(onAsset);
+            syncMenuMaster();
+          }
+          syncStudioOnPanel();
         }
         setStudioViewMode(mode);
       }
 
-      // ★ OFF側の編集操作（移動/拡大/センター/リセット/消しゴム）は必ずOFF表示で行う
+      // ★ OFF側の編集操作（スライダー/センター/リセット/消しゴム/自動配置）は必ずOFF表示で行う
       function ensureOffEditing() {
         stopTapSimulation();
         if (menuStudioState.viewMode !== "off") setStudioTab("off");
@@ -2084,7 +2037,7 @@
       document.querySelectorAll(".bg-toggle-btn").forEach(btn => {
         btn.onclick = () => {
           menuStudioState.bgMode = btn.dataset.bg;
-          canvasWrapper.className = `relative rounded-2xl overflow-hidden border-2 border-emerald-500 shadow-inner flex items-center justify-center w-[300px] h-[300px] cursor-grab select-none touch-none ${btn.dataset.bg === 'white' ? 'bg-white' : btn.dataset.bg === 'black' ? 'bg-slate-950' : 'bg-slate-900 checker-bg'}`;
+          canvasWrapper.className = `relative rounded-md overflow-hidden border-2 border-emerald-500 shadow-inner cursor-grab select-none touch-none ${btn.dataset.bg === 'white' ? 'bg-white' : btn.dataset.bg === 'black' ? 'bg-slate-950' : 'bg-slate-900 checker-bg'}`;
           document.querySelectorAll(".bg-toggle-btn").forEach(b => b.className = "bg-toggle-btn px-2 py-0.5 rounded bg-white border border-slate-300 font-semibold");
           btn.className = "bg-toggle-btn px-2 py-0.5 rounded bg-slate-800 text-white border border-slate-800 font-bold";
         };
@@ -2099,10 +2052,11 @@
         modeEraserBtn.className = "flex-1 py-1 rounded font-bold transition text-slate-600 hover:text-slate-900";
         eraserSizes.classList.add("hidden");
         canvasWrapper.style.cursor = "grab";
-        document.getElementById("mStudioInstruction").innerHTML = "💡 画像を<b>ドラッグして移動</b> / <b>ホイールで拡大縮小</b>";
+        document.getElementById("mStudioInstruction").innerHTML = "💡 画像を<b>ドラッグして移動</b> / <b>ホイールで拡大縮小</b>（出力サイズのキャンバス上で調整）";
       };
 
       modeEraserBtn.onclick = () => {
+        ensureOffEditing();
         menuStudioState.editMode = "eraser";
         modeEraserBtn.className = "flex-1 py-1 rounded font-bold transition bg-white text-slate-900 shadow-xs";
         modeMoveBtn.className = "flex-1 py-1 rounded font-bold transition text-slate-600 hover:text-slate-900";
@@ -2119,122 +2073,142 @@
         };
       });
 
-      scaleRange.oninput = (e) => {
-        ensureOffEditing();
-        const offAsset = state.assets[`${menuStudioState.currentItemId}_off`];
-        if (!offAsset) return;
-        offAsset.cropConfig.scale = parseInt(e.target.value);
-        document.getElementById("mStudioScaleVal").textContent = offAsset.cropConfig.scale + "%";
-        drawMenuStudio();
-      };
+      scaleRange.oninput = (e) => {ensureOffEditing(); applyOffConf({scale: parseFloat(e.target.value)});};
+      xRange.oninput = (e) => {ensureOffEditing(); applyOffConf({x: parseFloat(e.target.value)});};
+      yRange.oninput = (e) => {ensureOffEditing(); applyOffConf({y: parseFloat(e.target.value)});};
 
-      xRange.oninput = (e) => {
-        ensureOffEditing();
-        const offAsset = state.assets[`${menuStudioState.currentItemId}_off`];
-        if (!offAsset) return;
-        offAsset.cropConfig.x = parseInt(e.target.value);
-        document.getElementById("mStudioXVal").textContent = offAsset.cropConfig.x + "px";
-        drawMenuStudio();
-      };
+      centerBtn.onclick = () => {ensureOffEditing(); applyOffConf({x: 0, y: 0});};
 
-      yRange.oninput = (e) => {
-        ensureOffEditing();
-        const offAsset = state.assets[`${menuStudioState.currentItemId}_off`];
-        if (!offAsset) return;
-        offAsset.cropConfig.y = parseInt(e.target.value);
-        document.getElementById("mStudioYVal").textContent = offAsset.cropConfig.y + "px";
-        drawMenuStudio();
-      };
+      // 初期化: 現在の出力規格の拡大率・位置だけを初期値へ（画像・消しゴムは変更しない）
+      resetBtn.onclick = () => {ensureOffEditing(); applyOffConf({scale: 100, x: 0, y: 0});};
 
-      centerBtn.onclick = () => {
-        ensureOffEditing();
-        const offAsset = state.assets[`${menuStudioState.currentItemId}_off`];
-        if (!offAsset) return;
-        offAsset.cropConfig.x = 0;
-        offAsset.cropConfig.y = 0;
-        xRange.value = 0;
-        yRange.value = 0;
-        document.getElementById("mStudioXVal").textContent = "0px";
-        document.getElementById("mStudioYVal").textContent = "0px";
-        drawMenuStudio();
-      };
-
-      resetBtn.onclick = () => {
-        ensureOffEditing();
-        const offAsset = state.assets[`${menuStudioState.currentItemId}_off`];
-        if (!offAsset) return;
-        offAsset.cropConfig = {scale: 100, x: 0, y: 0};
-        offAsset.maskDataUrl = null;
-        menuStudioState.maskTouched = true;
-        if (menuStudioState.maskCanvas) {
-          const mCtx = menuStudioState.maskCanvas.getContext("2d");
-          mCtx.clearRect(0, 0, 300, 300);
-        }
-        syncStudioSliders();
-        drawMenuStudio();
-      };
+      // ---- 消しゴム: 元画像の座標系に作業キャンバスを作り、出力キャンバス上の位置を逆算して消去 ----
+      function ensureWorkCanvas() {
+        const id = menuStudioState.currentItemId;
+        if (menuStudioState.workCanvas && menuStudioState.workItemId === id) return menuStudioState.workCanvas;
+        const off = state.assets[`${id}_off`];
+        const base = off && (off.img || off.rawSourceImg);
+        if (!base) return null;
+        const w = base.naturalWidth || base.width, h = base.naturalHeight || base.height;
+        const wc = document.createElement("canvas");
+        wc.width = w; wc.height = h;
+        wc.getContext("2d").drawImage(base, 0, 0, w, h);
+        menuStudioState.workCanvas = wc;
+        menuStudioState.workItemId = id;
+        menuStudioState.erased = false;
+        return wc;
+      }
 
       function eraseAt(cx, cy) {
-        if (!menuStudioState.maskCanvas) return;
-        menuStudioState.maskTouched = true;
+        const wc = ensureWorkCanvas();
+        if (!wc) return;
+        const id = menuStudioState.currentItemId;
+        const o = B_OUTPUT[menuStudioState.device];
+        const conf = menuConfOf(state.assets[`${id}_off`], o.idx);
         const rect = canvasWrapper.getBoundingClientRect();
-        const x = (cx - rect.left) * (300 / rect.width);
-        const y = (cy - rect.top) * (300 / rect.height);
+        if (!rect.width || !rect.height) return;
+        const ox = (cx - rect.left) * (o.w / rect.width);
+        const oy = (cy - rect.top) * (o.h / rect.height);
+        const r = menuOffDrawRect(wc.width, wc.height, o.w, o.h, conf);
+        const ix = (ox - r.dx) / r.dw * wc.width;
+        const iy = (oy - r.dy) / r.dh * wc.height;
+        const radiusOut = (menuStudioState.eraserRadius / 2) * (o.w / rect.width);
+        const ir = radiusOut / r.dw * wc.width;
 
-        const mCtx = menuStudioState.maskCanvas.getContext("2d");
-        mCtx.save();
-        mCtx.fillStyle = "#ff0000";
-        mCtx.beginPath();
-        mCtx.arc(x, y, menuStudioState.eraserRadius / 2, 0, Math.PI * 2);
-        mCtx.fill();
-        mCtx.restore();
-
+        const ctx = wc.getContext("2d");
+        ctx.save();
+        ctx.globalCompositeOperation = "destination-out";
+        ctx.beginPath();
+        ctx.arc(ix, iy, ir, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        menuStudioState.erased = true;
         drawMenuStudio();
       }
 
-      function onPointerDown(e) {
+      eraserUndoBtn.onclick = () => {
         ensureOffEditing();
-        menuStudioState.isInteracting = true;
-        const cx = e.clientX || (e.touches && e.touches[0].clientX);
-        const cy = e.clientY || (e.touches && e.touches[0].clientY);
+        const id = menuStudioState.currentItemId;
+        const off = state.assets[`${id}_off`];
+        const on = state.assets[`${id}_on`];
+        const raw = off && off.rawSourceImg;
+        if (!raw) return;
+        markMenuImgIndep(id);
+        const finish = (img) => {
+          off.img = img;
+          off.maskDataUrl = null;
+          if (on && !on.customUploaded) on.img = img;
+          menuStudioState.workCanvas = null;
+          menuStudioState.workItemId = null;
+          menuStudioState.erased = false;
+          drawMenuStudio();
+          renderSectionContent("B");
+          renderPreview();
+          triggerAutoSave();
+        };
+        if (off.img === raw) {finish(raw); return;}
+        const cc = off.cropConfig || {scale: 100, x: 0, y: 0};
+        const cv = document.createElement("canvas");
+        drawCropToCanvas(cv, raw, 400, 400, cc.scale, cc.x, cc.y, "contain", false);
+        const im = new Image();
+        im.onload = () => finish(im);
+        im.src = cv.toDataURL("image/png");
+      };
 
-        if (menuStudioState.editMode === "eraser" && menuStudioState.viewMode === "off") {
-          eraseAt(cx, cy);
+      function pointerXY(e) {
+        const t = (e.touches && e.touches[0]) || e;
+        return {cx: t.clientX, cy: t.clientY};
+      }
+
+      function onPointerDown(e) {
+        stopTapSimulation();
+        menuStudioState.isInteracting = true;
+        const {cx, cy} = pointerXY(e);
+        const id = menuStudioState.currentItemId;
+        const o = B_OUTPUT[menuStudioState.device];
+        menuStudioState.dragStartX = cx;
+        menuStudioState.dragStartY = cy;
+
+        if (menuStudioState.viewMode === "off") {
+          if (menuStudioState.editMode === "eraser") {
+            eraseAt(cx, cy);
+          } else {
+            canvasWrapper.style.cursor = "grabbing";
+            const conf = menuConfOf(state.assets[`${id}_off`], o.idx);
+            menuStudioState.startConfX = conf.x;
+            menuStudioState.startConfY = conf.y;
+          }
         } else {
-          canvasWrapper.style.cursor = "grabbing";
-          menuStudioState.dragStartX = cx;
-          menuStudioState.dragStartY = cy;
-          const offAsset = state.assets[`${menuStudioState.currentItemId}_off`];
-          menuStudioState.startConfX = offAsset?.cropConfig.x || 0;
-          menuStudioState.startConfY = offAsset?.cropConfig.y || 0;
+          // ON編集: 上下ドラッグ = ONの上下位置(Y)。ONタブのまま調整する
+          const onAsset = state.assets[`${id}_on`];
+          menuStudioState.startAgY = (onAsset && onAsset.autoGen && onAsset.autoGen.yShift) || 0;
         }
         e.preventDefault();
       }
 
       function onPointerMove(e) {
         if (!menuStudioState.isInteracting) return;
-        const cx = e.clientX || (e.touches && e.touches[0].clientX);
-        const cy = e.clientY || (e.touches && e.touches[0].clientY);
+        const {cx, cy} = pointerXY(e);
+        const rect = canvasWrapper.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
 
-        if (menuStudioState.editMode === "eraser" && menuStudioState.viewMode === "off") {
-          eraseAt(cx, cy);
+        if (menuStudioState.viewMode === "off") {
+          if (menuStudioState.editMode === "eraser") {
+            eraseAt(cx, cy);
+          } else {
+            const dxp = (cx - menuStudioState.dragStartX) / rect.width * 100;
+            const dyp = (cy - menuStudioState.dragStartY) / rect.height * 100;
+            applyOffConf({x: menuStudioState.startConfX + dxp, y: menuStudioState.startConfY + dyp});
+          }
         } else {
-          const dx = Math.round(cx - menuStudioState.dragStartX);
-          const dy = Math.round(cy - menuStudioState.dragStartY);
-
-          const offAsset = state.assets[`${menuStudioState.currentItemId}_off`];
-          if (!offAsset) return;
-
-          offAsset.cropConfig.x = Math.max(-800, Math.min(800, menuStudioState.startConfX + dx));
-          offAsset.cropConfig.y = Math.max(-800, Math.min(800, menuStudioState.startConfY + dy));
-
-          xRange.value = offAsset.cropConfig.x;
-          yRange.value = offAsset.cropConfig.y;
-          document.getElementById("mStudioXVal").textContent = offAsset.cropConfig.x + "px";
-          document.getElementById("mStudioYVal").textContent = offAsset.cropConfig.y + "px";
-
-          drawMenuStudio();
+          const dyp = (cy - menuStudioState.dragStartY) / rect.height * 100;
+          const yr = document.getElementById("mAgYRange");
+          triggerOnEffectChange(ag => {
+            ag.yShift = Math.max(parseFloat(yr.min), Math.min(parseFloat(yr.max), Math.round(menuStudioState.startAgY + dyp)));
+          });
+          syncStudioOnPanel();
         }
+        if (e.cancelable) e.preventDefault();
       }
 
       function onPointerUp() {
@@ -2251,17 +2225,24 @@
       window.addEventListener("touchend", onPointerUp);
 
       canvasWrapper.addEventListener("wheel", (e) => {
-        if (menuStudioState.editMode === "eraser") return;
+        if (menuStudioState.viewMode === "off" && menuStudioState.editMode === "eraser") return;
         e.preventDefault();
-        ensureOffEditing();
-        const delta = e.deltaY < 0 ? 10 : -10;
-        const offAsset = state.assets[`${menuStudioState.currentItemId}_off`];
-        if (!offAsset) return;
-        offAsset.cropConfig.scale = Math.max(10, Math.min(1000, offAsset.cropConfig.scale + delta));
-        scaleRange.value = offAsset.cropConfig.scale;
-        document.getElementById("mStudioScaleVal").textContent = offAsset.cropConfig.scale + "%";
-        drawMenuStudio();
+        stopTapSimulation();
+        if (menuStudioState.viewMode === "off") {
+          const o = B_OUTPUT[menuStudioState.device];
+          const conf = menuConfOf(state.assets[`${menuStudioState.currentItemId}_off`], o.idx);
+          applyOffConf({scale: conf.scale + (e.deltaY < 0 ? 5 : -5)});
+        } else {
+          const sr = document.getElementById("mAgScaleRange");
+          triggerOnEffectChange(ag => {
+            ag.scaleRatio = Math.max(parseFloat(sr.min), Math.min(parseFloat(sr.max), (ag.scaleRatio || 90) + (e.deltaY < 0 ? 2 : -2)));
+          });
+          syncStudioOnPanel();
+        }
       }, {passive: false});
+
+      // 呼び出し元(loadItemIntoStudio)が、開く状態(OFF/ON・出力規格)を明示的に指定できるようにする
+      menuStudioState.api = {setTab: setStudioTab, setDevice: setStudioDevice};
 
       // ★★★ ON設定操作時: 自動でエフェクトを有効化し、ON表示へ即座に連動！ ★★★
       const agScale = document.getElementById("mAgScaleRange");
@@ -2275,11 +2256,19 @@
       const agShadow = document.getElementById("mAgShadowToggle");
 
       function triggerOnEffectChange(callback) {
-        const onAsset = state.assets[`${menuStudioState.currentItemId}_on`];
+        const id = menuStudioState.currentItemId;
+        const onAsset = state.assets[`${id}_on`];
         if (!onAsset) return;
         stopTapSimulation();
+        const before = JSON.stringify(onAsset.autoGen);
+        if (id !== B_MASTER_ID) {
+          // 子の個別編集。先に独立させてから値を書き込む（1番マスターの同期で上書きされないように）
+          markMenuIndep(id, "fx");
+        }
         ensureAgEnabled(onAsset);
         callback(onAsset.autoGen);
+        if (JSON.stringify(onAsset.autoGen) !== before) syncMenuMaster();
+        updateStudioItemBadge();
         setStudioTab("on");
       }
 
@@ -2351,232 +2340,179 @@
     }
 
     // =========================================================================
-    // ★ 1番をベースにコピー（複製）: 1番の完成状態を任意のメニューボタンへ独立コピー
+    // ★ B: 1番マスター同期 ＆ 出力規格ごとの調整値
+    //   ・調整値は出力規格ごとの specsConfig（iOS 26 = [0] / 従来・Android = [1]）に保存する
+    //   ・1番の「従来/Android」「iOS 26」「ON加工」が、それぞれ別系統のマスター
+    //   ・2〜9は、その系統を個別編集していなければ1番に自動追従し、個別編集した系統だけ独立する
+    //   ・画像そのものは同期しない（各ボタンの画像はそれぞれのもの）
     // =========================================================================
-    const BASE_MENU_ID = SECTIONS.B.items[0].id;
+    const B_MASTER_ID = SECTIONS.B.items[0].id;
+    const B_OUTPUT = {
+      legacy: {w: 128, h: 150, idx: 1, zoom: 2.4, label: "従来 / Android"},
+      ios26: {w: 80, h: 56, idx: 0, zoom: 4, label: "iOS 26"}
+    };
 
-    function menuButtonHasContent(id) {
-      const o = state.assets[`${id}_off`];
-      const n = state.assets[`${id}_on`];
-      return !!((o && (o.img || o.rawSourceImg)) || (n && n.customUploaded));
+    function menuConfOf(asset, idx) {
+      return (asset && asset.specsConfig && asset.specsConfig[idx]) ? asset.specsConfig[idx] : {scale: 100, x: 0, y: 0};
     }
 
-    function cloneImageElement(img) {
-      return new Promise(resolve => {
-        if (!img || !img.src) {resolve(img || null); return;}
+    function ensureSpecsArray(asset) {
+      if (!Array.isArray(asset.specsConfig)) asset.specsConfig = [];
+      while (asset.specsConfig.length < 2) asset.specsConfig.push({scale: 100, x: 0, y: 0});
+    }
+
+    // 変種関係の子(4,5,7,9)が自分の画像を持った（アップロード/削除/消しゴム）ら、画像の引き継ぎを止める
+    function markMenuImgIndep(itemId) {
+      const meta = SECTIONS.B.items.find(it => it.id === itemId);
+      if (meta && meta.inheritFrom) markMenuIndep(itemId, "img");
+    }
+
+    // 子の個別編集フラグ（group: "legacy" | "ios26" | "fx"）。1番(マスター)は対象外
+    function markMenuIndep(itemId, group) {
+      if (itemId === B_MASTER_ID) return false;
+      const f = state.menuIndep[itemId] || (state.menuIndep[itemId] = {legacy: false, ios26: false, fx: false, img: false});
+      if (f[group]) return false;
+      f[group] = true;
+      triggerAutoSave();
+      return true;
+    }
+
+    // OFFの位置・拡大(出力規格ごと)を更新。ONは常にOFFと同じ配置。変更があれば true
+    function setMenuOffConf(itemId, idx, patch) {
+      const {offAsset: off, onAsset: on} = ensureMenuButtonAssets(itemId);
+      const cur = off.specsConfig[idx];
+      const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+      const r1 = (v) => Math.round(v * 10) / 10;
+      const next = {
+        scale: r1(clamp(Number(patch.scale !== undefined ? patch.scale : cur.scale), 10, 1000)),
+        x: r1(clamp(Number(patch.x !== undefined ? patch.x : cur.x), -150, 150)),
+        y: r1(clamp(Number(patch.y !== undefined ? patch.y : cur.y), -150, 150))
+      };
+      if (next.scale === cur.scale && next.x === cur.x && next.y === cur.y) return false;
+
+      if (itemId !== B_MASTER_ID) markMenuIndep(itemId, idx === 1 ? "legacy" : "ios26");   // 先に独立させてから書き込む
+      off.specsConfig[idx] = next;
+      if (!on.customUploaded) on.specsConfig[idx] = {...next};
+      syncMenuMaster();   // 1番→2,3,6,8 / 3→4 / 6→5,7 / 8→9 と順に反映
+      return true;
+    }
+
+    // 調整値の追従元: 変種関係(3=4, 6=5=7, 8=9)の子は親、それ以外(2,3,6,8)は1番マスター。
+    // 一覧は「親→子」の順に並んでいるため、1回の走査で 1番→親→子 と連鎖して反映される。
+    function menuSourceOf(item) {
+      return item.inheritFrom || B_MASTER_ID;
+    }
+
+    // 個別編集していない系統だけ、追従元の調整値へ揃える（何度呼んでも同じ結果）。変更があれば true
+    function syncMenuMaster() {
+      const mOff = state.assets[`${B_MASTER_ID}_off`];
+      if (!mOff) return false;
+      const {onAsset: mOn} = ensureMenuButtonAssets(B_MASTER_ID);
+      let changed = false;
+      const same = (a, b) => a && b && a.scale === b.scale && a.x === b.x && a.y === b.y;
+      const put = (asset, idx, c) => {
+        if (!same(asset.specsConfig[idx], c)) {asset.specsConfig[idx] = {scale: c.scale, x: c.x, y: c.y}; changed = true;}
+      };
+
+      // マスター自身も、ONの配置は常にOFFと同じ
+      if (!mOn.customUploaded) [0, 1].forEach(idx => put(mOn, idx, menuConfOf(mOff, idx)));
+
+      for (const it of SECTIONS.B.items) {
+        if (it.id === B_MASTER_ID) continue;
+        const flags = state.menuIndep[it.id] || {};
+        const {offAsset: off, onAsset: on} = ensureMenuButtonAssets(it.id);
+        const src = ensureMenuButtonAssets(menuSourceOf(it));
+        for (const [grp, idx] of [["legacy", 1], ["ios26", 0]]) {
+          if (flags[grp]) continue;
+          const sc = menuConfOf(src.offAsset, idx);
+          put(off, idx, sc);
+          if (!on.customUploaded) put(on, idx, sc);
+        }
+        if (!flags.fx && src.onAsset.autoGen) {
+          const j = JSON.stringify(src.onAsset.autoGen);
+          if (JSON.stringify(on.autoGen) !== j) {on.autoGen = JSON.parse(j); changed = true;}
+        }
+      }
+      return changed;
+    }
+
+    // 変種関係の子(4,5,7,9)の画像: 親の画像を「複製」して引き継ぐ（参照は共有しない）。
+    // 子に自分で画像をアップロード／消しゴム編集した場合は独立し、以後は親の画像変更で上書きしない。
+    function cloneImgElement(img) {
+      return new Promise(res => {
+        if (!img || !img.src) {res(img || null); return;}
         const c = new Image();
-        c.onload = () => resolve(c);
-        c.onerror = () => resolve(img);
+        c.onload = () => res(c);
+        c.onerror = () => res(img);
         c.src = img.src;
       });
     }
 
-    // アセット1件を完全複製（Imageは再生成、オブジェクトはディープコピー。参照は一切共有しない）
-    async function cloneMenuAsset(src, imgCache) {
-      const out = {};
-      for (const [k, v] of Object.entries(src)) {
-        if (v instanceof HTMLImageElement) {
-          if (!imgCache.has(v)) imgCache.set(v, await cloneImageElement(v));
-          out[k] = imgCache.get(v);
-        } else if (v && typeof v === "object") {
-          out[k] = JSON.parse(JSON.stringify(v));
-        } else {
-          out[k] = v;
-        }
-      }
-      return out;
-    }
-
-    // コピー元(srcId)の完成状態を、コピー先(tid)用に完全複製して返す（まだ state には入れない）
-    async function buildMenuButtonClone(srcId, tid) {
-      const srcOff = state.assets[`${srcId}_off`];
-      const srcOn = state.assets[`${srcId}_on`];
-      if (!srcOff || (!srcOff.img && !srcOff.rawSourceImg)) return null;
-      const imgCache = new Map();
-      const newOff = await cloneMenuAsset(srcOff, imgCache);
-      const newOn = srcOn ? await cloneMenuAsset(srcOn, imgCache) : null;
-      // コピー先自身のOFFを参照するように付け替える
-      if (newOn) newOn.autoGenFrom = `${tid}_off`;
-      return {newOff, newOn};
-    }
-
-    function applyMenuButtonClone(tid, clone) {
-      state.assets[`${tid}_off`] = clone.newOff;
-      if (clone.newOn) {
-        state.assets[`${tid}_on`] = clone.newOn;
-      } else {
-        delete state.assets[`${tid}_on`];
-        ensureMenuButtonAssets(tid);
-      }
-    }
-
-    async function copyBaseMenuButtonTo(targetIds) {
-      let count = 0;
-      for (const tid of targetIds) {
-        if (tid === BASE_MENU_ID || !SECTIONS.B.items.some(it => it.id === tid)) continue;
-        const clone = await buildMenuButtonClone(BASE_MENU_ID, tid);
-        if (!clone) return count;
-        applyMenuButtonClone(tid, clone);
-        markMenuCustom(tid);   // 明示的な上書きコピー → 以後は親の変更で自動上書きしない
-        markMenuOwn(tid);
-        count++;
-      }
-      return count;
-    }
-
-    // =========================================================================
-    // ★ 関連アイコン間の自動継承（親 → 子）
-    //   SECTIONS.B.items の inheritFrom に親を定義。子が「個別編集済み」でない間だけ親の状態を複製して継承する。
-    // =========================================================================
-    // 子が自分の素材（アップロード／明示コピー）を持つことを記録（調整リセットでも素材を守るため）
-    function markMenuOwn(itemId) {
-      const meta = SECTIONS.B.items.find(it => it.id === itemId);
-      if (!meta || !meta.inheritFrom || state.menuOwn[itemId]) return;
-      state.menuOwn[itemId] = true;
-      triggerAutoSave();
-    }
-
-    function markMenuCustom(itemId) {
-      const meta = SECTIONS.B.items.find(it => it.id === itemId);
-      if (!meta || !meta.inheritFrom) return;   // 親を持たないボタン(1,2,3,6,8)は対象外
-      if (state.menuCustom[itemId]) return;
-      state.menuCustom[itemId] = true;
-      if (menuStudioState.currentItemId === itemId) updateStudioItemBadge();
-      triggerAutoSave();
-    }
-
-    function menuImgSig(img) {
-      if (!img || !img.src) return "-";
-      const s = img.src, m = s.length >> 1;
-      return `${s.length}:${s.slice(24, 72)}:${s.slice(m, m + 48)}:${s.slice(-48)}`;
-    }
-
-    // 親の状態が変わったかを判定するための軽量シグネチャ
-    function menuStateSig(id) {
-      const o = state.assets[`${id}_off`];
-      const n = state.assets[`${id}_on`];
-      if (!o) return "";
-      const md = o.maskDataUrl || "";
-      return JSON.stringify([
-        menuImgSig(o.img), menuImgSig(o.rawSourceImg), o.cropConfig, `${md.length}:${md.slice(-48)}`, o.specsConfig, o.filename || "",
-        n ? [menuImgSig(n.img), n.cropConfig, n.autoGen, !!n.customUploaded, n.specsConfig] : null
-      ]);
-    }
-
-    function menuParentHasImage(id) {
-      const o = state.assets[`${id}_off`];
-      return !!(o && (o.img || o.rawSourceImg));
-    }
-
-    let menuInheritRunning = false;
-    let menuInheritPending = false;
-
-    async function syncMenuInheritance() {
-      if (menuInheritRunning) {menuInheritPending = true; return [];}
-      menuInheritRunning = true;
-      const changed = new Set();
+    let menuImgRunning = false, menuImgPending = false;
+    async function syncMenuImages() {
+      if (menuImgRunning) {menuImgPending = true; return false;}
+      menuImgRunning = true;
+      let changed = false;
       try {
         do {
-          menuInheritPending = false;
+          menuImgPending = false;
           for (const it of SECTIONS.B.items) {
             if (!it.inheritFrom) continue;
-            const cid = it.id, pid = it.inheritFrom;
-            if (state.menuCustom[cid]) continue;          // 個別編集済みの子は触らない
-            if (!menuParentHasImage(pid)) continue;        // 親に設定がなければ何もしない
-            const sig = menuStateSig(pid);
-            if (state.menuSynced[cid] === sig && menuParentHasImage(cid)) continue;   // 親が変わっていない
+            if ((state.menuIndep[it.id] || {}).img) continue;
+            const pOff = state.assets[`${it.inheritFrom}_off`];
+            if (!pOff || !pOff.img) continue;
+            const {offAsset: off, onAsset: on} = ensureMenuButtonAssets(it.id);
+            if (off.img && off.img.src === pOff.img.src) continue;   // すでに同じ画像
 
-            const clone = await buildMenuButtonClone(pid, cid);
-            // 複製中に子が個別編集された場合は上書きしない
-            if (!clone || state.menuCustom[cid]) continue;
-            applyMenuButtonClone(cid, clone);
-            state.menuSynced[cid] = sig;
-            changed.add(cid);
+            const nImg = await cloneImgElement(pOff.img);
+            const nRaw = (pOff.rawSourceImg && pOff.rawSourceImg !== pOff.img) ? await cloneImgElement(pOff.rawSourceImg) : nImg;
+            const pOn = state.assets[`${it.inheritFrom}_on`];
+            const nOn = (pOn && pOn.customUploaded && pOn.img) ? await cloneImgElement(pOn.img) : null;
+            if ((state.menuIndep[it.id] || {}).img) continue;   // 複製中に子が独立した場合は上書きしない
+
+            off.img = nImg;
+            off.rawSourceImg = nRaw;
+            off.cropConfig = pOff.cropConfig ? {...pOff.cropConfig} : {scale: 100, x: 0, y: 0};
+            off.maskDataUrl = pOff.maskDataUrl || null;
+            off.filename = pOff.filename || "";
+            off.filesize = pOff.filesize || "";
+            on.autoGenFrom = `${it.id}_off`;
+            if (nOn) {on.img = nOn; on.customUploaded = true;} else {on.img = nImg; on.rawSourceImg = nRaw; on.customUploaded = false;}
+            changed = true;
           }
-        } while (menuInheritPending);
+        } while (menuImgPending);
       } finally {
-        menuInheritRunning = false;
+        menuImgRunning = false;
       }
-
-      if (changed.size) {
-        if (appUiReady) {
-          if (state.currentTab === "B") renderSectionContent("B");
-          const modal = document.getElementById("menuStudioModal");
-          if (modal && modal.classList.contains("active") && changed.has(menuStudioState.currentItemId)) {
-            refreshStudioItemData();   // 編集画面に表示中の子が更新された場合は読み込み直す
-          }
-          renderPreview();
-        }
-        triggerAutoSave();
-      }
-      return [...changed];
-    }
-
-    function openCopyBaseDialog() {
-      const srcOff = state.assets[`${BASE_MENU_ID}_off`];
-      if (!srcOff || (!srcOff.img && !srcOff.rawSourceImg)) {
-        alert("まずは1番(ホーム)のOFF画像を登録・調整してください。");
-        return;
-      }
-      document.getElementById("copyBaseDialog")?.remove();
-
-      const baseLabel = SECTIONS.B.items[0].label;
-      const targets = SECTIONS.B.items.filter(it => it.id !== BASE_MENU_ID);
-      const overlay = document.createElement("div");
-      overlay.id = "copyBaseDialog";
-      overlay.className = "fixed inset-0 z-[60] bg-black/70 flex items-center justify-center p-3";
-      overlay.innerHTML = `
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-          <div class="bg-indigo-600 text-white px-4 py-3">
-            <h3 class="font-bold text-sm">📋 1番をベースにコピー</h3>
-            <p class="text-[10px] text-indigo-100 mt-0.5">コピー元: ${baseLabel}（複製後はコピー先が完全に独立します）</p>
-          </div>
-          <div class="p-3 text-xs">
-            <div class="flex items-center justify-between mb-1.5">
-              <span class="font-bold text-slate-700">コピー先を選択</span>
-              <span class="flex gap-1">
-                <button type="button" id="copyBaseSelAll" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 font-semibold">全て選択</button>
-                <button type="button" id="copyBaseSelNone" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 font-semibold">全解除</button>
-              </span>
-            </div>
-            <div class="max-h-[50vh] overflow-y-auto space-y-1">
-              ${targets.map(it => `
-                <label class="flex items-center gap-2 px-2 py-1.5 rounded border border-slate-200 hover:bg-slate-50 cursor-pointer">
-                  <input type="checkbox" class="copy-base-chk rounded" value="${it.id}">
-                  <span class="font-semibold text-slate-800">${it.label}</span>
-                  ${menuButtonHasContent(it.id) ? '<span class="ml-auto text-[9px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1">設定済み（上書き）</span>' : ''}
-                </label>`).join("")}
-            </div>
-          </div>
-          <div class="px-3 pb-3 flex justify-end gap-2 text-xs">
-            <button type="button" id="copyBaseCancel" class="px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200 font-bold">キャンセル</button>
-            <button type="button" id="copyBaseRun" class="px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white font-bold disabled:opacity-40" disabled>選択した項目にコピー</button>
-          </div>
-        </div>`;
-      document.body.appendChild(overlay);
-
-      const chks = () => [...overlay.querySelectorAll(".copy-base-chk")];
-      const runBtn = overlay.querySelector("#copyBaseRun");
-      const refresh = () => {runBtn.disabled = !chks().some(c => c.checked);};
-      chks().forEach(c => c.onchange = refresh);
-      overlay.querySelector("#copyBaseSelAll").onclick = () => {chks().forEach(c => c.checked = true); refresh();};
-      overlay.querySelector("#copyBaseSelNone").onclick = () => {chks().forEach(c => c.checked = false); refresh();};
-      overlay.querySelector("#copyBaseCancel").onclick = () => overlay.remove();
-      overlay.addEventListener("mousedown", (e) => {if (e.target === overlay) overlay.remove();});
-
-      runBtn.onclick = async () => {
-        const ids = chks().filter(c => c.checked).map(c => c.value);
-        if (!ids.length) return;
-        const overwrite = ids.filter(menuButtonHasContent);
-        if (overwrite.length && !confirm(`設定済みのボタン ${overwrite.length} 個を上書きします。よろしいですか？`)) return;
-        runBtn.disabled = true;
-        const n = await copyBaseMenuButtonTo(ids);
-        overlay.remove();
-        renderSectionContent("B");
+      if (changed && appUiReady) {
+        if (state.currentTab === "B") renderSectionContent("B");
+        const modal = document.getElementById("menuStudioModal");
+        if (modal && modal.classList.contains("active")) drawMenuStudio();
         renderPreview();
         triggerAutoSave();
-        alert(`1番をベースに ${n} 個のボタンへ複製しました。以降は各ボタンを独立して編集できます。`);
-      };
+      }
+      return changed;
+    }
+
+    // OFF画像の描画矩形（drawCropToCanvas の bottom-contain / OFF と同じ計算）
+    function menuOffDrawRect(natW, natH, W, H, conf) {
+      const imgA = natW / natH, tA = W / H, sc = conf.scale / 100;
+      let dw, dh;
+      if (imgA > tA) {dw = W * 0.96 * sc; dh = dw / imgA;} else {dh = H * 0.96 * sc; dw = dh * imgA;}
+      return {dw, dh, dx: (W - dw) / 2 + conf.x * (W / 100), dy: (H - dh - H * 0.02) + conf.y * (H / 100)};
+    }
+
+    // 出力キャンバス上で、実際に描かれている範囲の中央X・下端を揃える位置(x, y %)を返す。拡大率は触らない
+    function computeMenuAutoPlacement(src, o, scale) {
+      const b = measureAlphaBounds(src);
+      if (!b || !b.hasTransparent || b.w < 1 || b.h < 1) return null;
+      const imgA = b.natW / b.natH, tA = o.w / o.h, sc = scale / 100;
+      let dw, dh;
+      if (imgA > tA) {dw = o.w * 0.96 * sc; dh = dw / imgA;} else {dh = o.h * 0.96 * sc; dw = dh * imgA;}
+      const x = ((o.w / 2) - (o.w - dw) / 2 - ((b.x + b.w / 2) / b.natW) * dw) / o.w * 100;
+      const y = dh * (1 - (b.y + b.h) / b.natH) / o.h * 100;
+      const r1 = (v) => Math.round(v * 10) / 10;
+      return {x: r1(x), y: r1(y)};
     }
 
     // =========================================================================
@@ -2591,7 +2527,7 @@
     };
 
     function measureAlphaBounds(img) {
-      const natW = img.naturalWidth, natH = img.naturalHeight;
+      const natW = img.naturalWidth || img.width, natH = img.naturalHeight || img.height;
       if (!natW || !natH) return null;
       const k = Math.min(1, 1024 / Math.max(natW, natH));
       const w = Math.max(1, Math.round(natW * k)), h = Math.max(1, Math.round(natH * k));
@@ -2652,7 +2588,6 @@
         data.cropConfig = conf;
         data.img = sq;
         data.rawSourceImg = rawImg;
-        data.specsConfig = [{scale: 100, x: 0, y: 0}, {scale: 100, x: 0, y: 0}];
         done(true);
       };
       sq.onerror = () => done(false);
@@ -3045,107 +2980,108 @@
       }, {passive: false});
     }
 
-    function openMenuButtonStudio(itemId) {
+    // ★ 開く対象(itemId)と状態(mode: "off"|"on")・出力規格(device: "legacy"|"ios26")を呼び出し元が明示する
+    function openMenuButtonStudio(itemId, mode, device) {
       const modal = document.getElementById("menuStudioModal");
       modal.classList.add("active");
       modal.classList.remove("pointer-events-none");
-      loadItemIntoStudio(itemId);
+      loadItemIntoStudio(itemId, mode, device);
     }
 
-    // ★ 1〜9共通: 指定ボタン自身の OFF/ON アセットを必ず用意して返す（他ボタンとは一切共有しない）
+    // 1〜9共通: 指定ボタン自身の OFF/ON アセットを必ず用意して返す（ON効果の有効化はしない）
     function ensureMenuButtonAssets(itemId) {
+      const def = () => ({scale: 100, x: 0, y: 0});
       if (!state.assets[`${itemId}_off`]) {
         state.assets[`${itemId}_off`] = {
-          img: null, rawSourceImg: null, cropConfig: {scale: 100, x: 0, y: 0},
-          maskDataUrl: null, mode: "bottom-contain", specsConfig: [{scale: 100, x: 0, y: 0}, {scale: 100, x: 0, y: 0}]
+          img: null, rawSourceImg: null, cropConfig: def(), maskDataUrl: null, customUploaded: false,
+          filename: "", filesize: "", mode: "bottom-contain", autoGen: defaultAutoGen(), autoGenFrom: null,
+          specsConfig: [def(), def()]
         };
       }
       if (!state.assets[`${itemId}_on`]) {
         state.assets[`${itemId}_on`] = {
-          img: null, rawSourceImg: null, cropConfig: {scale: 100, x: 0, y: 0},
-          mode: "bottom-contain", autoGenFrom: `${itemId}_off`, specsConfig: [{scale: 100, x: 0, y: 0}, {scale: 100, x: 0, y: 0}]
+          img: null, rawSourceImg: null, cropConfig: def(), maskDataUrl: null, customUploaded: false,
+          filename: "", filesize: "", mode: "bottom-contain", autoGen: defaultAutoGen(), autoGenFrom: `${itemId}_off`,
+          specsConfig: [def(), def()]
         };
       }
-      ensureAgEnabled(state.assets[`${itemId}_on`]);
-      return {offAsset: state.assets[`${itemId}_off`], onAsset: state.assets[`${itemId}_on`]};
+      const offAsset = state.assets[`${itemId}_off`], onAsset = state.assets[`${itemId}_on`];
+      if (!onAsset.autoGen) onAsset.autoGen = defaultAutoGen();
+      ensureSpecsArray(offAsset);
+      ensureSpecsArray(onAsset);
+      return {offAsset, onAsset};
     }
 
-    function loadItemIntoStudio(itemId) {
+    function loadItemIntoStudio(itemId, mode, device) {
       menuStudioState.currentItemId = itemId;
+      menuStudioState.workCanvas = null;
+      menuStudioState.workItemId = null;
+      menuStudioState.erased = false;
       document.getElementById("menuStudioItemSelect").value = itemId;
 
-      // 実機プレビューの選択ボタンを、編集中のボタンに合わせる（編集対象と選択状態の矛盾を防ぐ）
+      // 実機プレビューの選択ボタンを、編集中のボタンに合わせる
       state.activeButtonKey = itemId;
 
+      ensureMenuButtonAssets(itemId);
       refreshStudioItemData();
       document.getElementById("mStudioModeMoveBtn").click();
-      document.getElementById("mStudioTabOffBtn").click();
-      drawMenuStudio();
-      renderPreview();
 
-      // 親からの継承が未反映なら反映させる（反映されたらスタジオ表示も自動更新される）
-      syncMenuInheritance();
+      // 指定された状態で開く（未指定＝直前の表示状態を維持。常にOFFへ戻すことはしない）
+      const api = menuStudioState.api;
+      if (api) {
+        api.setDevice(device || menuStudioState.device);
+        api.setTab(mode || menuStudioState.viewMode);
+      }
+      renderPreview();
     }
 
-    // 現在の編集対象ボタンの保存済みデータを、スタジオUIへ読み込み直す（タブ/編集モードは変えない）
+    // 現在の編集対象ボタンの保存済みデータを、スタジオUIへ読み込み直す
     function refreshStudioItemData() {
-      const itemId = menuStudioState.currentItemId;
-      const {offAsset} = ensureMenuButtonAssets(itemId);
-
-      // マスクはボタンごとに新規Canvasを作り、そのボタンのOFF設定からだけ復元する
-      const maskCv = document.createElement("canvas");
-      maskCv.width = 300;
-      maskCv.height = 300;
-      menuStudioState.maskCanvas = maskCv;
-      menuStudioState.maskTouched = false;
-      if (offAsset.maskDataUrl) {
-        const mImg = new Image();
-        mImg.onload = () => {
-          // 読み込み中に別ボタンへ移動していたら破棄
-          if (menuStudioState.maskCanvas !== maskCv) return;
-          maskCv.getContext("2d").drawImage(mImg, 0, 0);
-          drawMenuStudio();
-        };
-        mImg.src = offAsset.maskDataUrl;
-      }
-
       syncStudioSliders();
       syncStudioOnPanel();
       updateStudioItemBadge();
-      menuStudioState.baseSig = studioEditSig();   // 個別編集判定の基準（読み込み直後の状態）
       drawMenuStudio();
-    }
-
-    function studioEditSig() {
-      const id = menuStudioState.currentItemId;
-      const off = state.assets[`${id}_off`];
-      const on = state.assets[`${id}_on`];
-      return JSON.stringify([off ? off.cropConfig : null, on ? on.autoGen : null]);
     }
 
     function updateStudioItemBadge() {
       const id = menuStudioState.currentItemId;
       const meta = SECTIONS.B.items.find(it => it.id === id);
       const el = document.getElementById("menuStudioItemBadge");
-      if (!el) return;
-      let text = meta ? meta.label : id;
-      if (meta && meta.inheritFrom) {
-        const parent = SECTIONS.B.items.find(it => it.id === meta.inheritFrom);
-        const pName = parent ? parent.label.replace(/\s*\(.*\)\s*$/, "") : meta.inheritFrom;
-        text += state.menuCustom[id] ? "（個別編集済み）" : `（${pName}を継承中）`;
+      if (el) el.textContent = meta ? meta.label : id;
+
+      const info = document.getElementById("mStudioSyncInfo");
+      if (!info) return;
+      const o = B_OUTPUT[menuStudioState.device];
+      if (id === B_MASTER_ID) {
+        info.innerHTML = `👑 <b>1番はマスター</b>です。ここでの調整は、個別編集していない2〜9へ自動で反映されます。<br>
+          <span class="text-slate-500">従来/Android と iOS 26 は別々のマスターです。ON加工は両方に共通です。</span>`;
+        return;
       }
-      el.textContent = text;
+      const f = state.menuIndep[id] || {};
+      const metaSelf = SECTIONS.B.items.find(it => it.id === id);
+      const srcMeta = SECTIONS.B.items.find(it => it.id === menuSourceOf(metaSelf));
+      const srcName = srcMeta ? srcMeta.label.replace(/\s*\(.*\)\s*$/, "") : "1番";
+      const tag = (indep) => indep
+        ? `<b class="text-amber-700">✏️ 個別編集済み</b>（${srcName}に追従しません）`
+        : `<b class="text-emerald-700">🔗 ${srcName}に追従中</b>`;
+      let html = `従来/Android: ${tag(f.legacy)}<br>iOS 26: ${tag(f.ios26)}<br>ON加工: ${tag(f.fx)}`;
+      if (metaSelf && metaSelf.inheritFrom) html += `<br>画像: ${tag(f.img)}`;
+      if (metaSelf && metaSelf.inheritFrom) {
+        html += `<br><span class="text-slate-500">※ ${srcName}は1番マスターに追従しているため、1番の調整は${srcName}を経由してこのボタンにも届きます。</span>`;
+      }
+      info.innerHTML = html;
     }
 
     function syncStudioSliders() {
-      const offAsset = state.assets[`${menuStudioState.currentItemId}_off`];
-      const conf = offAsset?.cropConfig || {scale: 100, x: 0, y: 0};
+      const id = menuStudioState.currentItemId;
+      const o = B_OUTPUT[menuStudioState.device];
+      const conf = menuConfOf(state.assets[`${id}_off`], o.idx);
       document.getElementById("mStudioScaleRange").value = conf.scale;
       document.getElementById("mStudioXRange").value = conf.x;
       document.getElementById("mStudioYRange").value = conf.y;
-      document.getElementById("mStudioScaleVal").textContent = conf.scale + "%";
-      document.getElementById("mStudioXVal").textContent = conf.x + "px";
-      document.getElementById("mStudioYVal").textContent = conf.y + "px";
+      document.getElementById("mStudioScaleVal").textContent = Math.round(conf.scale * 10) / 10 + "%";
+      document.getElementById("mStudioXVal").textContent = conf.x + "%";
+      document.getElementById("mStudioYVal").textContent = conf.y + "%";
     }
 
     function syncStudioOnPanel() {
@@ -3167,163 +3103,106 @@
       document.getElementById("mAgShadowToggle").checked = !!ag.shadowEnabled;
     }
 
+    // 消しゴム作業中の元画像（なければOFF画像）
+    function getMenuOffSource(itemId) {
+      if (menuStudioState.workCanvas && menuStudioState.workItemId === itemId) return menuStudioState.workCanvas;
+      const off = state.assets[`${itemId}_off`];
+      return off ? (off.img || off.rawSourceImg || null) : null;
+    }
+
+    // ZIP出力(createCroppedBlob)と同じ規則で、ON表示に使う元画像を決める
+    function getMenuOnSource(itemId) {
+      const on = state.assets[`${itemId}_on`];
+      let src = on ? on.img : null;
+      if (on && on.autoGen && on.autoGen.enabled && on.autoGenFrom && !on.customUploaded) {
+        const offSrc = getMenuOffSource(itemId);
+        if (offSrc) src = offSrc;
+      }
+      return src || getMenuOffSource(itemId);
+    }
+
+    // ★ LINEに実際に出力される規格のキャンバスへ、ZIP出力と同じ描画関数・同じ設定で描く
+    function renderMenuOutput(cv, itemId, view, dev) {
+      const o = B_OUTPUT[dev];
+      const off = state.assets[`${itemId}_off`], on = state.assets[`${itemId}_on`];
+      const gen = on ? on.autoGen : null;
+      if (view === "off") {
+        const src = getMenuOffSource(itemId);
+        if (!src) return false;
+        const c = menuConfOf(off, o.idx);
+        drawCropToCanvas(cv, src, o.w, o.h, c.scale, c.x, c.y, "bottom-contain", false, gen, true);
+      } else {
+        const src = getMenuOnSource(itemId);
+        if (!src) return false;
+        const c = menuConfOf(on, o.idx);
+        drawCropToCanvas(cv, src, o.w, o.h, c.scale, c.x, c.y, "bottom-contain", false, gen, false);
+      }
+      return true;
+    }
+
     function drawMenuStudio() {
       const cv = document.getElementById("mStudioMainCanvas");
       if (!cv) return;
-      cv.width = 300; cv.height = 300;
-      const ctx = cv.getContext("2d");
-      ctx.clearRect(0, 0, 300, 300);
-
-      const charCanvas = getStudioCroppedCharacterCanvas();
-      if (!charCanvas) {
-        ctx.fillStyle = "#94a3b8";
-        ctx.font = "12px sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText("画像がまだ登録されていません", 150, 150);
-        return;
+      const id = menuStudioState.currentItemId;
+      const o = B_OUTPUT[menuStudioState.device];
+      const ok = renderMenuOutput(cv, id, menuStudioState.viewMode, menuStudioState.device);
+      if (!ok) {
+        cv.width = o.w; cv.height = o.h;
+        cv.getContext("2d").clearRect(0, 0, o.w, o.h);
       }
+      const msg = document.getElementById("mStudioEmptyMsg");
+      if (msg) msg.classList.toggle("hidden", ok);
 
-      const isViewingOn = (menuStudioState.viewMode === "on");
-      const onAsset = state.assets[`${menuStudioState.currentItemId}_on`];
-      const ag = onAsset?.autoGen;
-
-      if (isViewingOn && ag && ag.enabled) {
-        renderCharacterWithEffects(ctx, charCanvas, 300, 300, ag);
-      } else {
-        ctx.drawImage(charCanvas, 0, 0);
-      }
-
-      // 下部のミニ実機プレビュー（iOS 26 / Android）も下揃え連動描画
-      drawStudioMiniPreviews(charCanvas, isViewingOn ? ag : null);
+      // 下部の実機規格プレビュー（iOS 26 / 従来・Android）は、両方の実出力を同時に表示
+      drawStudioMiniPreviews();
     }
 
-    function drawStudioMiniPreviews(charCanvas, ag) {
+    function drawStudioMiniPreviews() {
       const iosCv = document.getElementById("mStudioPreviewIosCv");
       const andCv = document.getElementById("mStudioPreviewAndCv");
-      if (!iosCv || !andCv || !charCanvas) return;
+      if (!iosCv || !andCv) return;
+      const id = menuStudioState.currentItemId;
+      const view = menuStudioState.viewMode;
+      const okI = renderMenuOutput(iosCv, id, view, "ios26");
+      const okA = renderMenuOutput(andCv, id, view, "legacy");
+      if (!okI) {iosCv.width = 80; iosCv.height = 56; iosCv.getContext("2d").clearRect(0, 0, 80, 56);}
+      if (!okA) {andCv.width = 128; andCv.height = 150; andCv.getContext("2d").clearRect(0, 0, 128, 150);}
 
-      drawSingleMiniPreview(iosCv, charCanvas, 80, 56, ag);
-      drawSingleMiniPreview(andCv, charCanvas, 128, 150, ag);
-
-      // ネオンが出力枠で見切れていないかを確認して警告
+      // ネオンなどが出力枠で見切れていないかを確認して警告
       const warn = document.getElementById("mAgNeonClipWarn");
       if (warn) {
-        const clipped = !!(ag && ag.enabled && ag.neonEnabled && (canvasEdgeHasInk(iosCv) || canvasEdgeHasInk(andCv)));
+        const on = state.assets[`${id}_on`];
+        const ag = on && on.autoGen;
+        const clipped = !!(view === "on" && ag && ag.enabled && ag.neonEnabled && (canvasEdgeHasInk(iosCv) || canvasEdgeHasInk(andCv)));
         warn.classList.toggle("hidden", !clipped);
       }
     }
 
-    function drawSingleMiniPreview(cv, charImg, targetW, targetH, ag) {
-      cv.width = targetW; cv.height = targetH;
-      const ctx = cv.getContext("2d");
-      ctx.clearRect(0, 0, targetW, targetH);
-
-      const padding = 0.94;
-      const aspect = charImg.width / charImg.height;
-      const targetAspect = targetW / targetH;
-      let dw, dh;
-      if (aspect > targetAspect) {
-        dw = targetW * padding;
-        dh = dw / aspect;
-      } else {
-        dh = targetH * padding;
-        dw = dh * aspect;
-      }
-
-      const dx = (targetW - dw) / 2;
-      const dy = targetH - dh - 2;
-
-      ctx.save();
-      if (ag && ag.enabled) {
-        const scale = (ag.scaleRatio || 90) / 100;
-        const dwEff = dw * scale;
-        const dhEff = dh * scale;
-        const dxEff = (targetW - dwEff) / 2;
-        const dyEff = targetH - dhEff - 2 + (ag.yShift || 0);
-
-        if (ag.neonEnabled) {
-          ctx.save();
-          ctx.shadowColor = ag.neonColor || "#00ffcc";
-          ctx.shadowBlur = getNeonBlur(ag) * (targetW / 100);
-          ctx.drawImage(charImg, dxEff, dyEff, dwEff, dhEff);
-          ctx.restore();
-        }
-        ctx.drawImage(charImg, dxEff, dyEff, dwEff, dhEff);
-      } else {
-        ctx.drawImage(charImg, dx, dy, dw, dh);
-      }
-      ctx.restore();
-    }
-
+    // 消しゴムの結果だけを元画像に確定する（位置・拡大は編集と同時に specsConfig へ保存済み）
     function saveCurrentStudioItem() {
-      const savingItemId = menuStudioState.currentItemId;   // 非同期処理中に別ボタンへ移動しても、保存対象を取り違えない
-      const offAsset = state.assets[`${savingItemId}_off`];
-      const onAsset = state.assets[`${savingItemId}_on`];
-      if (!offAsset) return;
-
-      // 子ボタンをスタジオで実際に編集していたら「個別編集済み」にする（開いて移動しただけでは変えない）
-      if (menuStudioState.baseSig != null &&
-          (studioEditSig() !== menuStudioState.baseSig || menuStudioState.maskTouched)) {
-        markMenuCustom(menuStudioState.currentItemId);
-        menuStudioState.baseSig = studioEditSig();
-        menuStudioState.maskTouched = false;
-      }
-
-      const sourceImg = offAsset.rawSourceImg || offAsset.img;
-      if (!sourceImg) return;
-
-      if (menuStudioState.maskCanvas) {
-        offAsset.maskDataUrl = menuStudioState.maskCanvas.toDataURL("image/png");
-      }
-
-      const croppedCanvas = cropSourceImageFromEditor(
-        sourceImg,
-        300, 300,
-        offAsset.cropConfig.scale,
-        offAsset.cropConfig.x,
-        offAsset.cropConfig.y,
-        menuStudioState.maskCanvas
-      );
+      const id = menuStudioState.currentItemId;
+      const wc = menuStudioState.workCanvas;
+      if (!wc || menuStudioState.workItemId !== id || !menuStudioState.erased) return;
+      const off = state.assets[`${id}_off`];
+      const on = state.assets[`${id}_on`];
+      if (!off) return;
+      menuStudioState.erased = false;
+      markMenuImgIndep(id);
 
       const newImg = new Image();
       newImg.onload = () => {
-        offAsset.img = newImg;
-        offAsset.specsConfig = [{scale: 100, x: 0, y: 0}, {scale: 100, x: 0, y: 0}];
-
-        if (onAsset) {
-          onAsset.img = newImg;
-          onAsset.rawSourceImg = sourceImg;
-          onAsset.cropConfig = {...offAsset.cropConfig};
-          onAsset.maskDataUrl = offAsset.maskDataUrl;
-          onAsset.autoGenFrom = `${savingItemId}_off`;
-          onAsset.specsConfig = [{scale: 100, x: 0, y: 0}, {scale: 100, x: 0, y: 0}];
+        off.img = newImg;
+        off.maskDataUrl = null;
+        if (on && !on.customUploaded) on.img = newImg;
+        if (menuStudioState.workItemId === id && menuStudioState.currentItemId === id) {
+          menuStudioState.workCanvas = null;
+          menuStudioState.workItemId = null;
         }
-
         renderSectionContent("B");
         renderPreview();
         triggerAutoSave();
       };
-      newImg.src = croppedCanvas.toDataURL("image/png");
-    }
-
-    function cropSourceImageFromEditor(sourceImg, targetW, targetH, scale, x, y, maskCanvas) {
-      const outSize = 400;
-      const outCanvas = document.createElement("canvas");
-      outCanvas.width = outSize;
-      outCanvas.height = outSize;
-      const ctx = outCanvas.getContext("2d");
-
-      drawCropToCanvas(outCanvas, sourceImg, outSize, outSize, scale, x, y, "contain", false);
-
-      if (maskCanvas) {
-        ctx.save();
-        ctx.globalCompositeOperation = "destination-out";
-        ctx.drawImage(maskCanvas, 0, 0, outSize, outSize);
-        ctx.restore();
-      }
-
-      checkBDEImageResolution(menuStudioState.currentItemId, outSize, outSize, menuStudioState.currentItemId);
-      return outCanvas;
+      newImg.src = wc.toDataURL("image/png");
     }
 
     // =========================================================================
@@ -3349,7 +3228,7 @@
       const genRatio = (!isOffMode && autoGen && autoGen.enabled) ? (autoGen.scaleRatio / 100) : 1.0;
       const sc = (scale / 100) * genRatio;
 
-      const imgAspect = img.naturalWidth / img.naturalHeight;
+      const imgAspect = (img.naturalWidth || img.width) / (img.naturalHeight || img.height);
       const targetAspect = targetW / targetH;
       let dw, dh;
 
@@ -4656,7 +4535,7 @@
 
     async function resetAllAdjustments() {
       if (!confirm("画像素材は残したまま、配置・拡大縮小・トリミング・各種調整を初期状態に戻します。よろしいですか？\n\n"
-        + "・B: 拡大縮小・X/Y・消しゴム・ONエフェクト(ネオン範囲など)・親子継承\n"
+        + "・B: 従来/Android・iOS 26の拡大縮小・X/Y・消しゴム・ONエフェクト・1番マスターへの追従\n"
         + "・D / E / F: 拡大縮小・X/Y・トリミング位置\n"
         + "※ アップロードした画像は削除されません。")) return;
 
@@ -4667,7 +4546,7 @@
         a.cropConfig = {scale: 100, x: 0, y: 0};
       }
 
-      // B: OFF画像の配置・マスク、ONの効果を初期化
+      // B: 消しゴム・出力規格ごとの位置/拡大・ONの効果を初期化
       for (const item of SECTIONS.B.items) {
         const off = state.assets[`${item.id}_off`];
         const on = state.assets[`${item.id}_on`];
@@ -4686,26 +4565,26 @@
         }
       }
 
-      // B親子継承を初期状態へ（3→4, 6→5・7, 8→9 を継承中に）。
-      // 子が自分で素材をアップロード／コピーしている場合は、素材を守るため独立のまま残す
-      const keptIndependent = [];
-      const nextCustom = {};
+      // 追従関係を初期状態へ。ただし、子(4,5,7,9)が自分で登録した画像は素材なので、画像だけは独立のまま残す
+      const keptOwnImages = [];
+      const nextIndep = {};
       SECTIONS.B.items.forEach(it => {
-        if (!it.inheritFrom) return;
-        if (state.menuOwn[it.id] && menuParentHasImage(it.id)) {
-          nextCustom[it.id] = true;
-          keptIndependent.push(it.label.replace(/\s*\(.*\)\s*$/, ""));
+        const f = state.menuIndep[it.id];
+        const a = state.assets[`${it.id}_off`];
+        if (it.inheritFrom && f && f.img && a && a.img) {
+          nextIndep[it.id] = {legacy: false, ios26: false, fx: false, img: true};
+          keptOwnImages.push(it.label.replace(/\s*\(.*\)\s*$/, ""));
         }
       });
-      state.menuCustom = nextCustom;
-      state.menuSynced = {};
-      await syncMenuInheritance();
+      state.menuIndep = nextIndep;
+      syncMenuMaster();
+      await syncMenuImages();
 
       renderSectionContent(state.currentTab);
       renderPreview();
       triggerAutoSave();
       alert("調整を初期状態に戻しました（画像素材はそのまま残っています）。"
-        + (keptIndependent.length ? `\n\n自分で画像を登録した ${keptIndependent.join("、")} は、素材を守るため独立のままです。` : ""));
+        + (keptOwnImages.length ? `\n\n自分で画像を登録した ${keptOwnImages.join("、")} の画像は、素材を守るため独立のままです。` : ""));
     }
 
     // =========================================================================
@@ -4838,12 +4717,10 @@
       if (confirm("作業中のすべての画像・調整内容をリセットしますか？\n（ブラウザ内の保存データも消去されます）")) {
         await clearDB();
         state.assets = {};
-        state.menuCustom = {};
-        state.menuSynced = {};
+        state.menuIndep = {};
         studioState.sourceImg = null;
         state.talkBgColor = "#edf8fb";
         state.talkBgNone = false;
-        state.menuOwn = {};
         renderSectionContent(state.currentTab);
         renderPreview();
         document.getElementById("saveStatus").textContent = "☁️ リセット完了";
