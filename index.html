@@ -185,6 +185,9 @@
 
     }
 
+    .m-neon-chip.active {border-color: #059669; background: #ecfdf5; color: #065f46; box-shadow: 0 0 0 1.5px #059669;}
+    @media (max-width: 767px) {.m-neon-chip {min-height: 32px;}}
+
     .st-menubar {display: none; width: 100%; max-width: 340px; margin-top: 12px; background: #f8fafc; padding: 8px; border-radius: 12px; border: 1px solid #e2e8f0; box-sizing: border-box;}
     .st-menubar .st-mb-head {display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 6px;}
     .st-menubar .st-mb-title {font-size: 10px; font-weight: 700; color: #334155;}
@@ -820,15 +823,27 @@
                   </label>
                 </div>
 
-                <div class="grid grid-cols-2 gap-1.5 bg-white p-1.5 rounded border border-slate-200 text-[10px]">
-                  <div class="flex items-center justify-between">
-                    <label class="flex items-center gap-1 cursor-pointer font-semibold">
-                      <input type="checkbox" id="mAgNeonToggle" class="rounded text-cyan-600">
-                      <span>背景ネオン</span>
-                    </label>
-                    <input type="color" id="mAgNeonPicker" value="#00ffcc"
-                      class="w-4 h-4 rounded cursor-pointer p-0 bg-transparent">
+                <div class="bg-white p-1.5 rounded border border-slate-200 text-[10px]">
+                  <div class="font-semibold mb-1">背景ネオン色</div>
+                  <div id="mAgNeonChips" class="flex flex-wrap gap-1">
+                    <button type="button" class="m-neon-chip px-2 py-1 rounded border border-slate-300 bg-white font-bold" data-neon="none">ネオンなし</button>
+                    <button type="button" class="m-neon-chip px-2 py-1 rounded border border-slate-300 bg-white font-bold" data-neon="blue"><i class="inline-block w-2.5 h-2.5 rounded-full mr-1 border border-slate-300" style="background:#00e5ff"></i>青</button>
+                    <button type="button" class="m-neon-chip px-2 py-1 rounded border border-slate-300 bg-white font-bold" data-neon="green"><i class="inline-block w-2.5 h-2.5 rounded-full mr-1 border border-slate-300" style="background:#00ff7f"></i>緑</button>
+                    <button type="button" class="m-neon-chip px-2 py-1 rounded border border-slate-300 bg-white font-bold" data-neon="pink"><i class="inline-block w-2.5 h-2.5 rounded-full mr-1 border border-slate-300" style="background:#ff007f"></i>ピンク</button>
+                    <button type="button" class="m-neon-chip px-2 py-1 rounded border border-slate-300 bg-white font-bold" data-neon="yellow"><i class="inline-block w-2.5 h-2.5 rounded-full mr-1 border border-slate-300" style="background:#ffe600"></i>黄色</button>
+                    <button type="button" class="m-neon-chip px-2 py-1 rounded border border-slate-300 bg-white font-bold" data-neon="white"><i class="inline-block w-2.5 h-2.5 rounded-full mr-1 border border-slate-400" style="background:#ffffff"></i>白</button>
+                    <button type="button" class="m-neon-chip px-2 py-1 rounded border border-slate-300 bg-white font-bold" data-neon="custom">🎨 その他</button>
                   </div>
+                  <div id="mAgNeonCustomRow" class="hidden mt-1.5 flex items-center gap-2 bg-slate-50 border border-slate-200 rounded px-2 py-1">
+                    <span class="font-semibold">その他の色:</span>
+                    <input type="color" id="mAgNeonPicker" value="#ff00aa"
+                      class="w-7 h-6 rounded cursor-pointer p-0 bg-transparent">
+                    <span id="mAgNeonCustomHex" class="font-mono text-slate-600">#ff00aa</span>
+                  </div>
+                  <input type="checkbox" id="mAgNeonToggle" class="hidden" tabindex="-1" aria-hidden="true">
+                </div>
+
+                <div class="grid grid-cols-1 gap-1.5 bg-white p-1.5 rounded border border-slate-200 text-[10px]">
                   <div class="flex items-center justify-between">
                     <label class="flex items-center gap-1 cursor-pointer font-semibold">
                       <input type="checkbox" id="mAgOutlineToggle" class="rounded text-emerald-600">
@@ -1626,6 +1641,26 @@
     function getNeonBlur(ag) {
       const v = Number(ag && ag.neonBlur);
       return v > 0 ? v : 14;
+    }
+    // ネオン色の選択肢（既存プリセットボタンと同じ色）。「その他」は autoGen.neonCustomColor に保持する
+    const NEON_PRESET_COLORS = {blue: "#00e5ff", green: "#00ff7f", pink: "#ff007f", yellow: "#ffe600", white: "#ffffff"};
+    function getNeonMode(ag) {
+      if (!ag || !ag.neonEnabled) return "none";
+      const c = String(ag.neonColor || "").toLowerCase();
+      if (ag.neonMode === "custom" && ag.neonCustomColor && c === String(ag.neonCustomColor).toLowerCase()) return "custom";
+      for (const [k, hex] of Object.entries(NEON_PRESET_COLORS)) if (hex === c) return k;
+      return "custom";   // 従来の自由色（#00ffccなど）は「その他」として扱い、色はそのまま維持
+    }
+    function syncNeonChips(ag) {
+      const mode = getNeonMode(ag);
+      document.querySelectorAll("#mAgNeonChips .m-neon-chip").forEach(b => b.classList.toggle("active", b.dataset.neon === mode));
+      const row = document.getElementById("mAgNeonCustomRow");
+      if (row) row.classList.toggle("hidden", mode !== "custom");
+      const cc = (ag && (ag.neonCustomColor || (mode === "custom" ? ag.neonColor : ""))) || "#ff00aa";
+      const pk = document.getElementById("mAgNeonPicker");
+      if (pk) pk.value = /^#[0-9a-fA-F]{6}$/.test(cc) ? cc : "#ff00aa";
+      const hx = document.getElementById("mAgNeonCustomHex");
+      if (hx) hx.textContent = pk ? pk.value : cc;
     }
     function neonBlurLabel(v) {
       return (v <= 9 ? "狭い" : (v <= 18 ? "標準" : "広い")) + ` (${v})`;
@@ -2477,8 +2512,30 @@
         triggerOnEffectChange(ag => {ag.neonEnabled = e.target.checked;});
       };
       agNeonPicker.oninput = (e) => {
-        triggerOnEffectChange(ag => {ag.neonColor = e.target.value;});
+        triggerOnEffectChange(ag => {
+          ag.neonEnabled = true; ag.neonMode = "custom";
+          ag.neonColor = e.target.value; ag.neonCustomColor = e.target.value;   // 他の色へ切り替えても保持される
+        });
       };
+      document.querySelectorAll("#mAgNeonChips .m-neon-chip").forEach(btn => {
+        btn.onclick = () => {
+          const m = btn.dataset.neon;
+          triggerOnEffectChange(ag => {
+            // 「その他」から離れる前に、現在の自由色を保持しておく
+            if (getNeonMode(ag) === "custom" && ag.neonColor) ag.neonCustomColor = ag.neonColor;
+            if (m === "none") {
+              ag.neonEnabled = false;
+            } else if (m === "custom") {
+              ag.neonEnabled = true; ag.neonMode = "custom";
+              if (!ag.neonCustomColor) ag.neonCustomColor = "#ff00aa";
+              ag.neonColor = ag.neonCustomColor;
+            } else {
+              ag.neonEnabled = true; ag.neonMode = m;
+              ag.neonColor = NEON_PRESET_COLORS[m];
+            }
+          });
+        };
+      });
 
       document.getElementById("mAgNeonBlurRange").oninput = (e) => {
         triggerOnEffectChange(ag => {
@@ -3416,7 +3473,7 @@
       document.getElementById("mAgYRange").value = ag.yShift || 0;
       document.getElementById("mAgYVal").textContent = (ag.yShift || 0) + "px";
       document.getElementById("mAgNeonToggle").checked = !!ag.neonEnabled;
-      document.getElementById("mAgNeonPicker").value = ag.neonColor || "#00ffcc";
+      syncNeonChips(ag);
       document.getElementById("mAgNeonBlurRange").value = getNeonBlur(ag);
       document.getElementById("mAgNeonBlurVal").textContent = neonBlurLabel(getNeonBlur(ag));
       document.getElementById("mAgOutlineToggle").checked = !!ag.outlineEnabled;
