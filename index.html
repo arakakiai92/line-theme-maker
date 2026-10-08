@@ -171,7 +171,7 @@
           <p class="text-[9px] text-emerald-100 hidden md:block">基本5アイコン・消しゴム削除・ONエフェクト即時反映</p>
         </div>
       </div>
-      <div class="flex items-center gap-1.5">
+      <div class="flex items-center gap-1.5 flex-wrap justify-end">
         <button id="openGlobalStudioBtn"
           class="text-[10px] md:text-xs font-bold bg-white text-emerald-700 hover:bg-emerald-50 px-2.5 py-1 rounded shadow flex items-center gap-1 transition">
           <span>✂ 大画像から切り出し</span>
@@ -184,6 +184,17 @@
           class="text-[10px] md:text-xs font-bold bg-slate-900 hover:bg-black text-white px-2.5 py-1 rounded shadow flex items-center gap-1 transition">
           <span>📦 ZIP出力</span>
         </button>
+        <button id="saveWorkZipBtn" type="button"
+          class="text-[10px] md:text-xs font-bold bg-white/15 hover:bg-white/30 text-white px-2 py-1 rounded whitespace-nowrap transition"
+          title="作業途中の状態をZIPに保存します（LINE提出用の完成品ZIPとは別物です。後で復元して編集を再開できます）">
+          💾 <span class="hidden md:inline">作業途中を保存</span><span class="md:hidden">保存</span>
+        </button>
+        <button id="restoreWorkZipBtn" type="button"
+          class="text-[10px] md:text-xs font-bold bg-white/15 hover:bg-white/30 text-white px-2 py-1 rounded whitespace-nowrap transition"
+          title="「作業途中を保存」で作ったZIPを読み込み、保存した時点の編集状態を復元します">
+          📂 <span class="hidden md:inline">作業途中ZIPを復元</span><span class="md:hidden">復元</span>
+        </button>
+        <input type="file" id="restoreWorkZipInput" accept=".zip,application/zip" class="hidden">
         <button id="resetAdjustBtn"
           class="text-[10px] md:text-xs font-medium bg-white/10 hover:bg-amber-500 hover:text-white px-2 py-1 rounded transition whitespace-nowrap"
           title="画像は残したまま、配置・拡大縮小・トリミング・各種調整だけを初期状態に戻します">
@@ -4943,6 +4954,210 @@
         renderPreview();
         document.getElementById("saveStatus").textContent = "☁️ リセット完了";
       }
+    };
+
+    // =========================================================================
+    // 作業途中ZIP（編集再開用プロジェクト保存／復元）
+    //   ※ LINE提出用の「📦 ZIP出力」(exportZipBtn) とは完全に別機能。IndexedDB自動保存も従来どおり動作する。
+    //   構造: project.json ＋ assets/ raw/ masks/ studio/ の個別画像ファイル（画像をBase64でJSONに詰め込まない）
+    // =========================================================================
+    const WORK_ZIP_FORMAT = "LINE_THEME_WORK_PROJECT";
+    const WORK_ZIP_VERSION = 1;
+    const WORK_IMG_EXT = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif"};
+    const WORK_EXT_MIME = {png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", gif: "image/gif"};
+
+    function workZipStatus(msg) {
+      const el = document.getElementById("saveStatus");
+      if (el) el.textContent = msg;
+    }
+
+    async function saveWorkProjectZip() {
+      if (typeof JSZip === "undefined" || typeof saveAs === "undefined") {
+        alert("ZIPライブラリの読み込みに失敗しました。ネットワーク接続を確認してください。");
+        return;
+      }
+      const btn = document.getElementById("saveWorkZipBtn");
+      btn.disabled = true;
+      try {
+        workZipStatus("💾 作業途中ZIPを作成中...");
+        const zip = new JSZip();
+        const written = new Map();   // 画像のsrc → ZIP内パス（同じ画像は1ファイルだけ保存）
+        const addImage = async (src, dir, baseName) => {
+          if (!src) return null;
+          if (written.has(src)) return written.get(src);
+          const blob = await (await fetch(src)).blob();
+          const ext = WORK_IMG_EXT[blob.type] || "png";
+          const path = `${dir}/${baseName}.${ext}`;
+          zip.file(path, blob, {compression: "STORE"});   // 画像は圧縮済みなので無圧縮で格納
+          written.set(src, path);
+          return path;
+        };
+
+        const assets = [];
+        for (const [k, v] of Object.entries(state.assets)) {
+          // IndexedDB保存(saveToDB)と同じ対象条件
+          if (!(v && (v.img || v.autoGenFrom || v.rawSourceImg || /^B_.+_(off|on)$/.test(k)))) continue;
+          const imgSrc = v.img ? v.img.src : null;
+          const rawSrc = v.rawSourceImg ? v.rawSourceImg.src : null;
+          assets.push({
+            key: k,
+            img: await addImage(imgSrc, "assets", k),
+            raw: rawSrc ? (rawSrc === imgSrc ? "same" : await addImage(rawSrc, "raw", `${k}_raw`)) : null,
+            mask: v.maskDataUrl ? await addImage(v.maskDataUrl, "masks", `${k}_mask`) : null,
+            cropConfig: v.cropConfig || null,
+            filename: v.filename || "image.png",
+            filesize: v.filesize || "",
+            mode: v.mode,
+            forceOpaque: v.forceOpaque,
+            specsConfig: v.specsConfig,
+            autoGen: v.autoGen,
+            autoGenFrom: v.autoGenFrom,
+            customUploaded: v.customUploaded
+          });
+        }
+
+        const studioSource = studioState.sourceImg ? await addImage(studioState.sourceImg.src, "studio", "source") : null;
+
+        const project = {
+          format: WORK_ZIP_FORMAT,
+          version: WORK_ZIP_VERSION,
+          savedAt: new Date().toISOString(),
+          appState: {
+            currentTab: state.currentTab,
+            currentView: state.currentView,
+            currentDevice: state.currentDevice,
+            activeButtonKey: state.activeButtonKey,
+            showBadgeGuide: !!state.showBadgeGuide,
+            talkBgColor: state.talkBgColor,
+            talkBgNone: !!state.talkBgNone
+          },
+          menuIndep: state.menuIndep,
+          menuIndepVer: 2,
+          studio: {sourceImage: studioSource},
+          assets
+        };
+        zip.file("project.json", JSON.stringify(project, null, 1), {compression: "DEFLATE"});
+
+        const blob = await zip.generateAsync({type: "blob"});
+        const d = new Date();
+        const p2 = (n) => String(n).padStart(2, "0");
+        const stamp = `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}`;
+        saveAs(blob, `LINE着せかえ_作業途中_${stamp}.zip`);
+        workZipStatus("💾 作業途中ZIPを保存しました");
+      } catch (err) {
+        console.error(err);
+        workZipStatus("⚠ 作業途中ZIPの保存に失敗");
+        alert("作業途中ZIPの保存に失敗しました。\n" + (err && err.message ? err.message : err));
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    // 復元: 一時データをすべて構築・検証してから、初めて state へ反映する（失敗時は現在の作業を変更しない）
+    async function restoreWorkProjectZip(file) {
+      try {
+        if (typeof JSZip === "undefined") throw new Error("ZIPライブラリが読み込まれていません。");
+        workZipStatus("📂 作業途中ZIPを確認中...");
+        let zip;
+        try {zip = await JSZip.loadAsync(file);} catch (e) {throw new Error("ZIPファイルとして読み込めませんでした。");}
+        const pjFile = zip.file("project.json");
+        if (!pjFile) throw new Error("project.json が見つかりません。作業途中ZIPではありません（完成品ZIPは復元できません）。");
+        let proj;
+        try {proj = JSON.parse(await pjFile.async("string"));} catch (e) {throw new Error("project.json が壊れています。");}
+        if (!proj || proj.format !== WORK_ZIP_FORMAT) throw new Error("このZIPは「作業途中を保存」で作成したZIPではありません。");
+        if (!Number.isInteger(proj.version) || proj.version < 1 || proj.version > WORK_ZIP_VERSION) {
+          throw new Error(`対応していないバージョンです（version: ${proj.version}）。`);
+        }
+        if (!Array.isArray(proj.assets) || !proj.appState || typeof proj.appState !== "object") throw new Error("project.json の内容が不正です。");
+
+        const urlCache = new Map();
+        const readDataUrl = async (path) => {
+          if (urlCache.has(path)) return urlCache.get(path);
+          const f = zip.file(path);
+          if (!f) throw new Error(`必要な画像がZIP内に見つかりません: ${path}`);
+          const ext = (path.split(".").pop() || "png").toLowerCase();
+          const url = `data:${WORK_EXT_MIME[ext] || "image/png"};base64,${await f.async("base64")}`;
+          urlCache.set(path, url);
+          return url;
+        };
+        const makeImage = async (path) => {
+          const url = await readDataUrl(path);
+          const img = new Image();
+          await new Promise((res, rej) => {
+            img.onload = () => res();
+            img.onerror = () => rej(new Error(`画像を読み込めません: ${path}`));
+            img.src = url;
+          });
+          return img;
+        };
+
+        // ---- 一時データの構築（ここまでは state を一切変更しない） ----
+        const tmpAssets = {};
+        for (const e of proj.assets) {
+          if (!e || typeof e.key !== "string") throw new Error("project.json の素材情報が不正です。");
+          const img = e.img ? await makeImage(e.img) : null;
+          const raw = e.raw === "same" ? (img ? await makeImage(e.img) : null) : (e.raw ? await makeImage(e.raw) : null);
+          tmpAssets[e.key] = {
+            img,
+            rawSourceImg: raw || img,
+            cropConfig: e.cropConfig || {scale: 100, x: 0, y: 0},
+            maskDataUrl: e.mask ? await readDataUrl(e.mask) : null,
+            filename: e.filename,
+            filesize: e.filesize,
+            mode: e.mode,
+            forceOpaque: e.forceOpaque,
+            specsConfig: e.specsConfig,
+            autoGen: e.autoGen,
+            autoGenFrom: e.autoGenFrom,
+            customUploaded: e.customUploaded
+          };
+        }
+        const tmpStudioImg = (proj.studio && proj.studio.sourceImage) ? await makeImage(proj.studio.sourceImage) : null;
+        const tmpIndep = (proj.menuIndep && typeof proj.menuIndep === "object") ? proj.menuIndep : {};
+
+        // ---- 確認（現在の作業がある場合のみ） ----
+        const hasWork = Object.values(state.assets).some(v => v && v.img) || !!studioState.sourceImg;
+        if (hasWork && !confirm("現在の作業内容は、作業途中ZIPの内容で置き換えられます。\nよろしいですか？")) {
+          workZipStatus("☁️ 復元をキャンセルしました");
+          return;
+        }
+
+        // ---- state へ反映 ----
+        const a = proj.appState;
+        state.assets = tmpAssets;
+        state.menuIndep = tmpIndep;
+        state.currentTab = SECTIONS[a.currentTab] ? a.currentTab : "A";
+        state.currentDevice = (a.currentDevice === "android" || a.currentDevice === "ios") ? a.currentDevice : "ios";
+        state.activeButtonKey = typeof a.activeButtonKey === "string" ? a.activeButtonKey : state.activeButtonKey;
+        state.showBadgeGuide = !!a.showBadgeGuide;
+        if (a.talkBgColor) state.talkBgColor = a.talkBgColor;
+        state.talkBgNone = !!a.talkBgNone;
+        studioState.sourceImg = tmpStudioImg;
+        menuStudioOpenSnap = null;   // 「開いた時点に戻す」用の一時保存は破棄（次に開いた時点が新しい基準になる）
+
+        // 既存の初期化処理と同じ流れで、親子・マスター同期 → 再描画
+        syncMenuMaster();
+        await syncMenuImages();
+        buildTabs();
+        switchTab(state.currentTab);
+        if (typeof a.currentView === "string") state.currentView = a.currentView;
+        updateAllPreviewControls();
+        renderPreview();
+        await saveToDB();   // 復元後の状態をIndexedDBにも保存
+        workZipStatus("📂 作業途中ZIPを復元しました");
+      } catch (err) {
+        console.error(err);
+        workZipStatus("⚠ 復元に失敗（現在の作業は変更されていません）");
+        alert("作業途中ZIPを復元できませんでした。\n" + (err && err.message ? err.message : err) + "\n\n現在の作業内容は変更されていません。");
+      }
+    }
+
+    document.getElementById("saveWorkZipBtn").onclick = saveWorkProjectZip;
+    document.getElementById("restoreWorkZipBtn").onclick = () => document.getElementById("restoreWorkZipInput").click();
+    document.getElementById("restoreWorkZipInput").onchange = async (e) => {
+      const f = e.target.files && e.target.files[0];
+      e.target.value = "";
+      if (f) await restoreWorkProjectZip(f);
     };
 
     window.onload = init;
