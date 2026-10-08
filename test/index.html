@@ -177,6 +177,27 @@
       #assetList button, #assetList label.cursor-pointer {min-height: 34px;}
       #assetList input[type=number], #assetList input[type=text] {min-height: 34px; font-size: 14px;}
       #tabContainer .tab-btn {min-height: 36px;}
+
+      /* B: ジャンプ欄（1〜9）を横スクロールさせず、収まらない分は自然に折り返して全9個を表示 */
+      #quickJumpBar > div:first-child {max-width: 100% !important; width: 100%; overflow: visible !important; flex-wrap: wrap; row-gap: 4px;}
+      #quickJumpBar #jumpButtons {flex-wrap: wrap; row-gap: 4px;}
+      #quickJumpBar #jumpButtons button {min-height: 30px; min-width: 32px; font-size: 12px; padding: 0 8px;}
+
+    }
+
+    .st-menubar {display: none; width: 100%; max-width: 340px; margin-top: 12px; background: #f8fafc; padding: 8px; border-radius: 12px; border: 1px solid #e2e8f0; box-sizing: border-box;}
+    .st-menubar .st-mb-head {display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 6px;}
+    .st-menubar .st-mb-title {font-size: 10px; font-weight: 700; color: #334155;}
+    .st-menubar .sp-switch {display: flex; gap: 2px; background: #e2e8f0; padding: 2px; border-radius: 8px; flex-shrink: 0;}
+    .st-menubar .sp-switch button {min-height: 28px; padding: 0 8px; border-radius: 6px; font-size: 10px; font-weight: 700; color: #475569; background: transparent;}
+    .st-menubar .sp-switch button.on {background: #fff; color: #0f172a; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);}
+    .st-menubar .sp-viewport {position: relative; width: 100%; overflow: hidden; border-radius: 10px; background: #cbd5e1;}
+    .st-menubar .sp-stage {position: absolute; left: 0; top: 0; width: 274px; height: 564px; transform-origin: 0 0;}
+    .st-menubar .sp-stage .phone-screen {height: 564px; width: 274px;}
+
+    /* B 専用スタジオのメニューバープレビューは、スマホ幅(767px以下)でのみ表示（上の display:none を上書きするため後ろに置く） */
+    @media (max-width: 767px) {
+      .st-menubar {display: block;}
     }
 
     #mobilePreviewModal,
@@ -663,6 +684,21 @@
                 </div>
               </div>
             </div>
+          </div>
+
+          <!-- スマホ専用: メニューバープレビュー（編集中も他の4ボタンとのバランスを確認できる。767px以下でのみ表示） -->
+          <div id="stMenuBar" class="st-menubar">
+            <div class="st-mb-head">
+              <span class="st-mb-title">メニューバープレビュー</span>
+              <div id="stMenuBarSwitch" class="sp-switch">
+                <button type="button" data-spdev="ios26">iOS 26</button>
+                <button type="button" data-spdev="legacy">従来 / Android</button>
+              </div>
+            </div>
+            <div id="stMenuBarViewport" class="sp-viewport">
+              <div id="stMenuBarStage" class="sp-stage"><div id="phoneScreen_stm" class="phone-screen"></div></div>
+            </div>
+            <p id="stMenuBarNote" class="text-[8px] text-slate-500 mt-1 leading-snug"></p>
           </div>
         </div>
 
@@ -3442,6 +3478,7 @@
 
       // 下部の実機規格プレビュー（iOS 26 / 従来・Android）は、両方の実出力を同時に表示
       drawStudioMiniPreviews();
+      renderStudioMenuBar();   // スマホ幅のときだけ、メニューバー全体のプレビューも同時に更新
     }
 
     function drawStudioMiniPreviews() {
@@ -5332,15 +5369,58 @@
       viewport.style.height = (h * s) + "px";
     }
 
-    document.querySelectorAll("#spDeviceSwitch button").forEach(btn => {
+    // 端末切り替え（B/C上部プレビューと、Bスタジオ内メニューバープレビューで共通）。既存の state.currentDevice だけを使う
+    document.querySelectorAll("#spDeviceSwitch button, #stMenuBarSwitch button").forEach(btn => {
       btn.onclick = () => {
         if (btn.dataset.spdev === "ios26") state.currentDevice = "ios26";
         else if (state.currentDevice === "ios26") state.currentDevice = "android";   // 従来・Android（iOS従来は維持）
         updateAllPreviewControls();
         renderPreview();
+        renderStudioMenuBar();
         triggerAutoSave();
       };
     });
+
+    // Bの専用スタジオ内: メニューバー全体のプレビュー。
+    //   B画面上部と同じ描画（renderScreenInstance の menu 表示）を、表示するだけで再利用する。state は書き換えない
+    //   （描画の間だけ currentView / activeButtonKey を一時的に差し替え、必ず元に戻す）。
+    function renderStudioMenuBar() {
+      if (!SP_MQ.matches) return;
+      const modal = document.getElementById("menuStudioModal");
+      const box = document.getElementById("stMenuBar");
+      if (!box || !modal || !modal.classList.contains("active")) return;
+      const viewport = document.getElementById("stMenuBarViewport");
+      const stage = document.getElementById("stMenuBarStage");
+      const W = viewport.clientWidth;
+      if (!W) return;
+
+      const sw = document.getElementById("stMenuBarSwitch");
+      sw.querySelectorAll("button").forEach(b => b.classList.toggle("on", (b.dataset.spdev === "ios26") === (state.currentDevice === "ios26")));
+
+      const id = menuStudioState.currentItemId;
+      const DEFAULT_5 = ["B_home", "B_talk", "B_voom", "B_news", "B_wallet"];
+      const isOn = menuStudioState.viewMode === "on";
+      // 編集中のボタンをメニューバーに必ず表示する。ON編集中は選択(ON)表示、
+      // OFF編集中の基本5ボタンは全てOFF表示にして、OFFの見え方をそのまま確認できるようにする
+      const tempActive = (isOn || !DEFAULT_5.includes(id)) ? id : "";
+
+      const prevView = state.currentView, prevActive = state.activeButtonKey;
+      state.currentView = "menu";
+      state.activeButtonKey = tempActive;
+      try {renderScreenInstance("_stm");} finally {state.currentView = prevView; state.activeButtonKey = prevActive;}
+
+      const y0 = SP_SCREEN_H - 84, h = 84;
+      const s = W / SP_SCREEN_W;
+      stage.style.transform = `translate(0px, ${-y0 * s}px) scale(${s})`;
+      viewport.style.height = (h * s) + "px";
+
+      const meta = SECTIONS.B.items.find(it => it.id === id);
+      const nm = meta ? meta.label.replace(/\s*\(.*\)\s*$/, "") : id;
+      document.getElementById("stMenuBarNote").textContent = (isOn || !DEFAULT_5.includes(id))
+        ? `編集中の「${nm}」は選択中（ON表示）で並べています`
+        : `編集中の「${nm}」はOFF表示で並べています`;
+    }
+    window.addEventListener("resize", () => {clearTimeout(spResizeTimer); spResizeTimer = setTimeout(renderStudioMenuBar, 150);});
     let spResizeTimer = null;
     window.addEventListener("resize", () => {clearTimeout(spResizeTimer); spResizeTimer = setTimeout(renderSpPreview, 120);});
     if (SP_MQ.addEventListener) SP_MQ.addEventListener("change", () => renderSpPreview());
