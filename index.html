@@ -226,7 +226,7 @@
   <header class="bg-[#00C300] text-white shadow-md sticky top-0 z-40">
     <div class="max-w-7xl mx-auto flex items-center justify-between px-3 py-2">
       <div class="flex items-center gap-2">
-        <img src="top-left.png" alt="Logo" class="h-8 w-8 object-contain drop-shadow"
+        <img src="../top-left.png" alt="Logo" class="h-8 w-8 object-contain drop-shadow"
           onerror="this.style.display='none'">
         <div>
           <div class="flex items-center gap-1.5">
@@ -1785,8 +1785,9 @@
 
       <div class="loaded-view ${isRegistered ? 'flex' : 'hidden'} items-center justify-between w-full px-1">
         <div class="flex items-center gap-1.5 min-w-0">
-          <div class="h-7 w-7 bg-white border rounded flex items-center justify-center overflow-hidden flex-shrink-0">
+          <div class="swap-thumb group relative h-8 w-8 bg-white border rounded flex items-center justify-center overflow-hidden flex-shrink-0" title="クリックして素材を別の画像に変更">
             <canvas class="thumb-canvas h-full w-full object-contain"></canvas>
+            <span class="absolute inset-x-0 bottom-0 bg-black/55 text-white text-[7px] leading-3 font-bold text-center pointer-events-none opacity-90 group-hover:bg-emerald-600">変更</span>
           </div>
           <div class="text-left min-w-0">
             <p class="text-[9px] font-bold text-slate-800 truncate orig-filename max-w-[100px]">
@@ -1883,10 +1884,14 @@
       }
 
       function handleFile(file) {
-        if (!file) return;
+        if (!file) return;   // ファイル選択のキャンセル: 現在の素材は一切変更しない
+        const failLoad = () => alert("画像を読み込めませんでした（壊れている、または対応していない形式です）。\n現在の素材はそのまま保持されています。");
+        if (file.type && !/^image\/(png|jpeg|webp)$/.test(file.type)) {failLoad(); return;}
         const reader = new FileReader();
+        reader.onerror = failLoad;
         reader.onload = (e) => {
           const img = new Image();
+          img.onerror = failLoad;   // デコードできない画像は、素材を差し替える前に中断（下の onload 内でだけ素材を書き換える）
           img.onload = () => {
             markMenuImgIndep(opt.parentItemKey);   // 子に直接アップロード = その子の画像は独立
             data.rawSourceImg = img;
@@ -1952,7 +1957,11 @@
         if (opt.parentItemKey) state.activeButtonKey = opt.parentItemKey;
         fileInput.click();
       };
-      fileInput.onchange = () => handleFile(fileInput.files[0]);
+      fileInput.onchange = () => {
+        const f = fileInput.files[0];
+        fileInput.value = "";   // 同じファイルを続けて選び直しても反応するように
+        handleFile(f);
+      };
 
       dropZone.ondragover = (e) => {e.preventDefault(); dropZone.classList.add("dragover");};
       dropZone.ondragleave = () => dropZone.classList.remove("dragover");
